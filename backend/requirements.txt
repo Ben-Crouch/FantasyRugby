@@ -1,0 +1,24 @@
+# Fantasy Rugby Backend Dependencies
+# Core Django framework and REST API
+Django==4.2.7                    # Web framework for Python
+djangorestframework==3.14.0      # REST API framework for Django
+django-cors-headers==4.3.1       # CORS handling for frontend communication
+
+# Configuration and environment management
+python-decouple==3.8             # Environment variable management
+
+# Database connectivity
+psycopg[binary]==3.2.10          # PostgreSQL adapter for Python
+
+# HTTP requests and API communication
+requests==2.31.0                 # HTTP library for Databricks API calls
+
+# Authentication and security
+PyJWT==2.8.0                     # JSON Web Token implementation
+
+# Additional development dependencies (uncomment for development)
+# pytest==7.4.0                  # Testing framework
+# pytest-django==4.5.2           # Django testing utilities
+# black==23.7.0                  # Code formatter
+# flake8==6.0.0                  # Linting tool
+# coverage==7.2.7                # Code coverage tool
