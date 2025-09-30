@@ -252,12 +252,74 @@ const Draft = () => {
       console.log('DEBUG: selectedPlayers:', selectedPlayers);
       console.log('DEBUG: teams:', teams);
       
-      // Prepare team rosters for saving
-      const teamRosters = teams.map(team => ({
-        team_id: team.id,
-        user_id: team.team_owner_user_id,
-        players: selectedPlayers[team.id] || []
-      }));
+      // Prepare team rosters for saving with proper starting/bench assignments
+      const teamRosters = teams.map(team => {
+        const userSelectedPlayers = selectedPlayers[team.id] || [];
+        
+        // Define required positions for starting XV
+        const requiredPositions = {
+          'Prop': 2,
+          'Hooker': 1,
+          'Lock': 2,
+          'Back Row': 3,
+          'Scrum-half': 1,
+          'Fly-half': 1,
+          'Centre': 1,
+          'Back Three': 2
+        };
+        
+        // Separate players into starting XV and bench
+        const startingPlayers = [];
+        const benchPlayers = [];
+        
+        // Assign players to starting XV first, then bench
+        // First, assign players to starting positions based on requirements
+        userSelectedPlayers.forEach(player => {
+          const position = player.fantasy_position;
+          const required = requiredPositions[position] || 0;
+          const currentCount = startingPlayers.filter(p => p.fantasy_position === position).length;
+          
+          console.log(`DEBUG: Player ${player.name} (${position}) - required: ${required}, current: ${currentCount}`);
+          
+          if (currentCount < required) {
+            console.log(`DEBUG: Adding ${player.name} to starting XV`);
+            startingPlayers.push({ ...player, is_starting: true });
+          } else {
+            console.log(`DEBUG: Adding ${player.name} to bench`);
+            benchPlayers.push({ ...player, is_starting: false, fantasy_position: 'Bench' });
+          }
+        });
+        
+        // If we don't have enough bench players, move some starting players to bench
+        // to ensure we have exactly 5 bench players
+        const totalRequiredStarting = Object.values(requiredPositions).reduce((a, b) => a + b, 0);
+        const maxStartingPlayers = Math.min(totalRequiredStarting, userSelectedPlayers.length - 5);
+        
+        if (startingPlayers.length > maxStartingPlayers) {
+          console.log(`DEBUG: Moving excess starting players to bench. Starting: ${startingPlayers.length}, Max: ${maxStartingPlayers}`);
+          const excessPlayers = startingPlayers.splice(maxStartingPlayers);
+          excessPlayers.forEach(player => {
+            console.log(`DEBUG: Moving ${player.name} from starting to bench`);
+            benchPlayers.push({ ...player, is_starting: false, fantasy_position: 'Bench' });
+          });
+        }
+        
+        console.log(`DEBUG: Team ${team.id} - Starting: ${startingPlayers.length}, Bench: ${benchPlayers.length}`);
+        console.log(`DEBUG: Starting players by position:`, startingPlayers.reduce((acc, p) => {
+          acc[p.fantasy_position] = (acc[p.fantasy_position] || 0) + 1;
+          return acc;
+        }, {}));
+        console.log(`DEBUG: Total players: ${userSelectedPlayers.length}, Required: ${Object.values(requiredPositions).reduce((a, b) => a + b, 0)}`);
+        
+        // Combine all players with proper fields
+        const allPlayers = [...startingPlayers, ...benchPlayers];
+        
+        return {
+          team_id: team.id,
+          user_id: team.team_owner_user_id,
+          players: allPlayers
+        };
+      });
       
       console.log('DEBUG: teamRosters being sent:', teamRosters);
       

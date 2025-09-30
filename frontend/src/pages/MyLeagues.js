@@ -53,7 +53,11 @@ const MyLeagues = () => {
   }, [user]);
 
   const handleLeagueClick = (leagueId) => {
-    navigate('/league-dashboard', { 
+    console.log('DEBUG: Navigating to league dashboard with leagueId:', leagueId);
+    // Store league ID in localStorage for persistence
+    localStorage.setItem('lastSelectedLeagueId', leagueId.toString());
+    // Use both state and URL params for more reliable navigation
+    navigate(`/league-dashboard?leagueId=${leagueId}`, { 
       state: { leagueId: leagueId } 
     });
   };
