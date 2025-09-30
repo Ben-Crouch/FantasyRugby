@@ -141,19 +141,27 @@ def user_leagues(request):
 @permission_classes([AllowAny])
 def league_teams(request):
     """Handle league teams using REST API"""
+    print("=" * 80)
+    print(f"DEBUG: league_teams() called with method: {request.method}")
+    print("=" * 80)
+    
     client = DatabricksRestClient()
     
     if request.method == 'GET':
         # Get all teams
         try:
+            print("DEBUG: About to execute SQL query for all teams")
             result = client.execute_sql("SELECT * FROM default.league_teams")
+            print(f"DEBUG: SQL query completed, got result: {bool(result)}")
             if result and 'result' in result and result['result'].get('data_array'):
                 teams = []
                 for row in result['result']['data_array']:
+                    team_name_from_db = row[2]
+                    print(f"DEBUG: Retrieved team_name from DB: {team_name_from_db} (type: {type(team_name_from_db)})")
                     teams.append({
                         'id': row[0],
                         'league_id': row[1],
-                        'team_name': row[2],
+                        'team_name': team_name_from_db,
                         'team_owner_user_id': row[3],
                         'wins': 0,  # Default values until statistics are implemented
                         'losses': 0,
@@ -230,6 +238,9 @@ def join_league(request, league_id):
         "error": "You are already in this league"
     }
     """
+    print("=" * 80)
+    print(f"JOIN_LEAGUE FUNCTION CALLED! League ID: {league_id}")
+    print("=" * 80)
     try:
         print(f"DEBUG: Join league request for league_id={league_id}")
         print(f"DEBUG: Request data: {request.data}")
@@ -283,13 +294,29 @@ def join_league(request, league_id):
             if current_teams >= max_teams:
                 return Response({'error': 'League is full'}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Escape single quotes in team name to prevent SQL injection and syntax errors
+        # Try backslash escaping for Databricks
+        team_name_escaped = team_name.replace("'", "\\'")
+        
         # Create team
         team_sql = f"""
         INSERT INTO default.league_teams (league_id, team_name, team_owner_user_id)
-        VALUES ({league_id}, '{team_name}', {user_id})
+        VALUES ({league_id}, '{team_name_escaped}', {user_id})
         """
         
+        print(f"DEBUG: Original team_name: {team_name}")
+        print(f"DEBUG: Escaped team_name: {team_name_escaped}")
+        print(f"DEBUG: Executing SQL: {team_sql}")
         result = client.execute_sql(team_sql)
+        print(f"DEBUG: Result status: {result.get('status') if result else 'No result'}")
+        
+        # Immediately query back what was inserted to verify
+        if result and 'status' in result and result['status'].get('state') == 'SUCCEEDED':
+            verify_sql = f"SELECT team_name FROM default.league_teams WHERE league_id = {league_id} AND team_owner_user_id = {user_id} ORDER BY created_at DESC LIMIT 1"
+            verify_result = client.execute_sql(verify_sql)
+            if verify_result and 'result' in verify_result:
+                stored_name = verify_result['result'].get('data_array', [[]])[0]
+                print(f"DEBUG: VERIFICATION - What Databricks actually stored: {stored_name}")
         
         if result and 'status' in result and result['status'].get('state') == 'SUCCEEDED':
             return Response({'status': 'Successfully joined league'}, status=status.HTTP_201_CREATED)
