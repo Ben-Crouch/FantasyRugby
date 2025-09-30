@@ -232,6 +232,36 @@ const Draft = () => {
     applyFilters(selectedPosition, name);
   };
 
+  const handleCompleteDraft = async () => {
+    try {
+      setLoading(true);
+      
+      // Prepare team rosters for saving
+      const teamRosters = teams.map(team => ({
+        team_id: team.id,
+        user_id: team.user_id,
+        players: selectedPlayers[team.id] || []
+      }));
+      
+      // Call the complete draft API using the service
+      const result = await leaguesAPI.completeDraft(leagueData.id, teamRosters);
+      console.log('Draft completed successfully:', result);
+      
+      // Navigate back to league dashboard
+      navigate('/league-dashboard', { 
+        state: { 
+          leagueId: leagueData.id,
+          draftCompleted: true
+        } 
+      });
+    } catch (err) {
+      console.error('Error completing draft:', err);
+      setError('Failed to complete draft. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const applyFilters = (position, name) => {
     let filtered = draftStarted ? availablePlayers : players;
 
@@ -1255,6 +1285,77 @@ const Draft = () => {
           </div>
 
         </>
+      )}
+      
+      {/* Draft Completion Modal */}
+      {draftComplete && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '2rem',
+            borderRadius: '8px',
+            maxWidth: '500px',
+            width: '90%',
+            textAlign: 'center'
+          }}>
+            <h2 style={{ 
+              color: 'var(--black)', 
+              marginBottom: '1rem',
+              fontSize: '1.5rem'
+            }}>
+              🎉 Draft Complete!
+            </h2>
+            <p style={{ 
+              color: 'var(--dark-gray)', 
+              marginBottom: '2rem',
+              fontSize: '1rem'
+            }}>
+              All teams have been drafted. You can now view the league table and manage your team.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button
+                onClick={handleCompleteDraft}
+                style={{
+                  backgroundColor: 'var(--primary-orange)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Complete Draft & Save Teams
+              </button>
+              <button
+                onClick={() => setDraftComplete(false)}
+                style={{
+                  backgroundColor: 'var(--light-gray)',
+                  color: 'var(--black)',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Continue Drafting
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

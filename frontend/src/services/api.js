@@ -138,6 +138,13 @@ export const leaguesAPI = {
   isUserLeagueAdmin: async (leagueId, userId) => {
     return apiRequest(`/admin/leagues/${leagueId}/users/${userId}/is-admin/`);
   },
+
+  completeDraft: async (leagueId, teamRosters) => {
+    return apiRequest(`/leagues/${leagueId}/complete-draft/`, {
+      method: 'POST',
+      body: JSON.stringify({ team_rosters: teamRosters }),
+    });
+  },
 };
 
 // Teams API

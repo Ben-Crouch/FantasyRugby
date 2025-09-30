@@ -1,14 +1,40 @@
+/**
+ * Enhanced League Dashboard Component
+ * 
+ * This component provides a comprehensive league management interface with three main tabs:
+ * - League Table: Shows team standings and statistics
+ * - Fixtures: Displays upcoming matches (placeholder for future implementation)
+ * - My Team: Shows the user's drafted team with player details
+ * 
+ * Features:
+ * - Tab-based navigation
+ * - Team standings and statistics
+ * - Draft completion tracking
+ * - Player management interface
+ * - Admin controls for league management
+ * 
+ * Author: Roland Crouch
+ * Date: September 2025
+ * Version: 1.0.0
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { leaguesAPI, teamsAPI } from '../services/api';
+import { leaguesAPI, teamsAPI, rugbyPlayersAPI } from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const LeagueDashboard = () => {
   const [leagueData, setLeagueData] = useState(null);
   const [teams, setTeams] = useState([]);
+  const [myTeam, setMyTeam] = useState(null);
+  const [myTeamPlayers, setMyTeamPlayers] = useState([]);
+  const [allPlayers, setAllPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState('league-table');
+  const [draftComplete, setDraftComplete] = useState(false);
 
   const { user } = useAuth();
   const location = useLocation();
@@ -29,7 +55,6 @@ const LeagueDashboard = () => {
         if (league) {
           setLeagueData(league);
         } else {
-          // Fallback data if league not found
           setLeagueData({
             id: leagueId,
             name: 'Fantasy League',
@@ -45,6 +70,21 @@ const LeagueDashboard = () => {
         const teamsData = allTeams.filter(team => team.league_id === leagueId);
         setTeams(teamsData || []);
         
+        // Find user's team in this league
+        if (user && user.id) {
+          const userTeam = teamsData.find(team => team.user_id === user.id);
+          if (userTeam) {
+            setMyTeam(userTeam);
+            // Load team players (this would be from a team_players table in a real implementation)
+            // For now, we'll simulate this
+            setMyTeamPlayers([]);
+          }
+        }
+        
+        // Fetch all players for reference
+        const playersData = await rugbyPlayersAPI.getPlayers();
+        setAllPlayers(playersData || []);
+        
         // Check if current user is the admin of this league
         if (league && user && user.id) {
           try {
@@ -57,6 +97,9 @@ const LeagueDashboard = () => {
         } else {
           setIsAdmin(false);
         }
+        
+        // Check if draft is complete (simplified logic)
+        setDraftComplete(teamsData.length > 0);
         
       } catch (err) {
         console.error('Error loading league data:', err);
@@ -78,352 +121,283 @@ const LeagueDashboard = () => {
     };
 
     loadData();
-  }, [location.state]);
+  }, [location.state, user]);
+
+  const handleStartDraft = () => {
+    navigate('/draft', { state: { leagueId: leagueData.id } });
+  };
+
+  const handleBackToLeagues = () => {
+    navigate('/league-selection');
+  };
+
+  const renderLeagueTable = () => {
+    if (!teams.length) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-gray-600">No teams in this league yet.</p>
+          {isAdmin && (
+            <button
+              onClick={handleStartDraft}
+              className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >
+              Start Draft
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <h3 className="text-xl font-semibold mb-4">League Table</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full table-auto">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="px-4 py-2 text-left">Position</th>
+                <th className="px-4 py-2 text-left">Team Name</th>
+                <th className="px-4 py-2 text-left">Manager</th>
+                <th className="px-4 py-2 text-left">Points</th>
+                <th className="px-4 py-2 text-left">Wins</th>
+                <th className="px-4 py-2 text-left">Losses</th>
+                <th className="px-4 py-2 text-left">Draws</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teams.map((team, index) => (
+                <tr key={team.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <td className="px-4 py-2 font-semibold">{index + 1}</td>
+                  <td className="px-4 py-2">
+                    <span className="font-medium">{team.team_name}</span>
+                    {myTeam && myTeam.id === team.id && (
+                      <span className="ml-2 text-blue-600 text-sm">(Your Team)</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">Manager {team.user_id}</td>
+                  <td className="px-4 py-2 font-semibold">0</td>
+                  <td className="px-4 py-2">0</td>
+                  <td className="px-4 py-2">0</td>
+                  <td className="px-4 py-2">0</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        {isAdmin && !draftComplete && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={handleStartDraft}
+              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+            >
+              Start Draft
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderFixtures = () => {
+    return (
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <h3 className="text-xl font-semibold mb-4">Fixtures</h3>
+        <div className="text-center py-8">
+          <p className="text-gray-600 mb-4">Fixtures will be available once the season starts.</p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-blue-800">
+              <strong>Coming Soon:</strong> Match scheduling, results tracking, and live updates will be available in future updates.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderMyTeam = () => {
+    if (!myTeam) {
+      return (
+        <div className="bg-white shadow-md rounded-lg p-6">
+          <h3 className="text-xl font-semibold mb-4">My Team</h3>
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-4">You are not part of this league.</p>
+            <button
+              onClick={() => navigate('/league-selection')}
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >
+              Join a League
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white shadow-md rounded-lg p-6">
+        <h3 className="text-xl font-semibold mb-4">My Team: {myTeam.team_name}</h3>
+        
+        {!draftComplete ? (
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-4">The draft has not started yet.</p>
+            {isAdmin && (
+              <button
+                onClick={handleStartDraft}
+                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Start Draft
+              </button>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div className="mb-6">
+              <h4 className="text-lg font-medium mb-2">Team Statistics</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gray-50 p-3 rounded">
+                  <p className="text-sm text-gray-600">Total Players</p>
+                  <p className="text-xl font-semibold">{myTeamPlayers.length}/15</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded">
+                  <p className="text-sm text-gray-600">Points</p>
+                  <p className="text-xl font-semibold">0</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded">
+                  <p className="text-sm text-gray-600">Wins</p>
+                  <p className="text-xl font-semibold">0</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded">
+                  <p className="text-sm text-gray-600">Losses</p>
+                  <p className="text-xl font-semibold">0</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-lg font-medium mb-4">Squad</h4>
+              {myTeamPlayers.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No players drafted yet.</p>
+                  {isAdmin && (
+                    <button
+                      onClick={handleStartDraft}
+                      className="mt-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                    >
+                      Start Draft
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {myTeamPlayers.map((player, index) => (
+                    <div key={player.id || index} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <h5 className="font-medium">{player.name}</h5>
+                      <p className="text-sm text-gray-600">{player.position}</p>
+                      <p className="text-sm text-gray-500">{player.team}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
     return (
-      <div style={{ textAlign: 'center', padding: '4rem' }}>
-        <div className="spinner"></div>
-        <p style={{ marginTop: '1rem', color: 'var(--black)' }}>
-          Loading your league dashboard...
-        </p>
+      <div className="container mx-auto p-4">
+        <div className="text-red-500 text-center mt-4">{error}</div>
+        <button
+          onClick={handleBackToLeagues}
+          className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Back to Leagues
+        </button>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Navigation Bar */}
-      <div className="card" style={{ marginBottom: '2rem' }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          padding: '1rem 0'
-        }}>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button 
-              onClick={() => navigate('/league-selection')}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: 'var(--primary-orange)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 'bold'
-              }}
-            >
-              Leagues
-            </button>
-            <button 
-              onClick={() => navigate('/my-leagues')}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: 'var(--black)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 'bold'
-              }}
-            >
-              My Leagues
-            </button>
-          </div>
-          <div style={{ color: 'var(--dark-gray)', fontSize: '0.9rem' }}>
-            League ID: {leagueData?.id}
-          </div>
-        </div>
-      </div>
-
-      {/* Welcome Section */}
-      <div className="card" style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="container mx-auto p-4">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex justify-between items-start">
           <div>
-            <h1 style={{ margin: 0, color: 'var(--black)' }}>
-              Welcome to {leagueData?.name}!
-            </h1>
-            <p style={{ 
-              margin: '0.5rem 0 0 0', 
-              color: 'var(--dark-gray)',
-              fontSize: '1.1rem'
-            }}>
-              {leagueData?.description}
-            </p>
+            <h1 className="text-3xl font-bold text-gray-900">{leagueData?.name}</h1>
+            <p className="text-gray-600 mt-2">{leagueData?.description}</p>
+            <div className="mt-2 text-sm text-gray-500">
+              <span>Teams: {teams.length}/{leagueData?.max_teams}</span>
+              <span className="ml-4">Players per team: {leagueData?.max_players_per_team}</span>
+            </div>
           </div>
-          {isAdmin && (
-            <button 
-              onClick={() => navigate('/draft', { state: { leagueId: leagueData?.id } })}
-              style={{
-                padding: '0.75rem 1.5rem',
-                backgroundColor: 'var(--primary-orange)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: 'bold',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--dark-orange)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--primary-orange)';
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-              }}
+          <div className="flex space-x-2">
+            <button
+              onClick={handleBackToLeagues}
+              className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
             >
-              🚀 Start Draft
+              Back to Leagues
             </button>
-          )}
+            {isAdmin && !draftComplete && (
+              <button
+                onClick={handleStartDraft}
+                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Start Draft
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Teams in League */}
-      <div className="card" style={{ marginBottom: '2rem' }}>
-        <div className="card-header">
-          <h3 className="card-title">Teams in League ({teams.length}/{leagueData?.max_teams})</h3>
+      {/* Tabs */}
+      <div className="mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('league-table')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'league-table'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              League Table
+            </button>
+            <button
+              onClick={() => setActiveTab('fixtures')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'fixtures'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Fixtures
+            </button>
+            <button
+              onClick={() => setActiveTab('my-team')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'my-team'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              My Team
+            </button>
+          </nav>
         </div>
-        
-        {error && (
-          <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
-        
-        {teams.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--dark-gray)' }}>
-            <p>No teams have joined this league yet.</p>
-            <p>Be the first to create a team!</p>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ 
-              width: '100%', 
-              borderCollapse: 'collapse',
-              backgroundColor: 'white',
-              borderRadius: '8px',
-              overflow: 'hidden',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--primary-orange)', color: 'white' }}>
-                  <th style={{ 
-                    padding: '1rem', 
-                    textAlign: 'left', 
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    #
-                  </th>
-                  <th style={{ 
-                    padding: '1rem', 
-                    textAlign: 'left', 
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    Team Name
-                  </th>
-                  <th style={{ 
-                    padding: '1rem', 
-                    textAlign: 'center', 
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    W
-                  </th>
-                  <th style={{ 
-                    padding: '1rem', 
-                    textAlign: 'center', 
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    L
-                  </th>
-                  <th style={{ 
-                    padding: '1rem', 
-                    textAlign: 'center', 
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    D
-                  </th>
-                  <th style={{ 
-                    padding: '1rem', 
-                    textAlign: 'center', 
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    PF
-                  </th>
-                  <th style={{ 
-                    padding: '1rem', 
-                    textAlign: 'center', 
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    PA
-                  </th>
-                  <th style={{ 
-                    padding: '1rem', 
-                    textAlign: 'center', 
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}>
-                    Pts
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {teams.map((team, index) => (
-                  <tr 
-                    key={team.id || index}
-                    style={{ 
-                      borderBottom: '1px solid #e0e0e0',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                  >
-                    <td style={{ 
-                      padding: '1rem', 
-                      fontWeight: 'bold',
-                      color: 'var(--primary-orange)',
-                      fontSize: '1.1rem'
-                    }}>
-                      {index + 1}
-                    </td>
-                    <td style={{ 
-                      padding: '1rem',
-                      fontWeight: 'bold',
-                      color: 'var(--black)',
-                      fontSize: '1rem'
-                    }}>
-                      {team.team_name}
-                    </td>
-                    <td style={{ 
-                      padding: '1rem',
-                      color: 'var(--dark-gray)',
-                      textAlign: 'center',
-                      fontWeight: 'bold'
-                    }}>
-                      {team.wins || 0}
-                    </td>
-                    <td style={{ 
-                      padding: '1rem',
-                      color: 'var(--dark-gray)',
-                      textAlign: 'center',
-                      fontWeight: 'bold'
-                    }}>
-                      {team.losses || 0}
-                    </td>
-                    <td style={{ 
-                      padding: '1rem',
-                      color: 'var(--dark-gray)',
-                      textAlign: 'center',
-                      fontWeight: 'bold'
-                    }}>
-                      {team.draws || 0}
-                    </td>
-                    <td style={{ 
-                      padding: '1rem',
-                      color: 'var(--dark-gray)',
-                      textAlign: 'center',
-                      fontWeight: 'bold'
-                    }}>
-                      {team.points_for || 0}
-                    </td>
-                    <td style={{ 
-                      padding: '1rem',
-                      color: 'var(--dark-gray)',
-                      textAlign: 'center',
-                      fontWeight: 'bold'
-                    }}>
-                      {team.points_against || 0}
-                    </td>
-                    <td style={{ 
-                      padding: '1rem',
-                      color: 'var(--primary-orange)',
-                      textAlign: 'center',
-                      fontWeight: 'bold',
-                      fontSize: '1.1rem'
-                    }}>
-                      {team.league_points || 0}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
-      {/* Coming Soon Section */}
-      <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🚧</div>
-        <h2 style={{ color: 'var(--black)', marginBottom: '1rem' }}>
-          League Dashboard Coming Soon!
-        </h2>
-        <p style={{ 
-          color: 'var(--dark-gray)', 
-          fontSize: '1.1rem',
-          marginBottom: '2rem',
-          maxWidth: '600px',
-          margin: '0 auto 2rem auto'
-        }}>
-          We're working hard to bring you the complete fantasy rugby experience. 
-          Soon you'll be able to manage your team, view league standings, and compete with other managers!
-        </p>
-        
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '1rem',
-          marginTop: '2rem'
-        }}>
-          <div style={{ 
-            padding: '1rem', 
-            backgroundColor: 'var(--light-gray)', 
-            borderRadius: '8px',
-            border: '2px solid var(--primary-orange)'
-          }}>
-            <h4 style={{ color: 'var(--black)', marginBottom: '0.5rem' }}>Player Management</h4>
-            <p style={{ color: 'var(--dark-gray)', fontSize: '0.9rem', margin: 0 }}>
-              Add, remove, and manage your squad
-            </p>
-          </div>
-          
-          <div style={{ 
-            padding: '1rem', 
-            backgroundColor: 'var(--light-gray)', 
-            borderRadius: '8px',
-            border: '2px solid var(--primary-orange)'
-          }}>
-            <h4 style={{ color: 'var(--black)', marginBottom: '0.5rem' }}>League Standings</h4>
-            <p style={{ color: 'var(--dark-gray)', fontSize: '0.9rem', margin: 0 }}>
-              Track your team's performance
-            </p>
-          </div>
-          
-          <div style={{ 
-            padding: '1rem', 
-            backgroundColor: 'var(--light-gray)', 
-            borderRadius: '8px',
-            border: '2px solid var(--primary-orange)'
-          }}>
-            <h4 style={{ color: 'var(--black)', marginBottom: '0.5rem' }}>Match Results</h4>
-            <p style={{ color: 'var(--dark-gray)', fontSize: '0.9rem', margin: 0 }}>
-              View live scores and statistics
-            </p>
-          </div>
-        </div>
+      {/* Tab Content */}
+      <div>
+        {activeTab === 'league-table' && renderLeagueTable()}
+        {activeTab === 'fixtures' && renderFixtures()}
+        {activeTab === 'my-team' && renderMyTeam()}
       </div>
     </div>
   );

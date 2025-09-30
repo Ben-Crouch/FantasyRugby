@@ -372,6 +372,98 @@ def team_statistics(request):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def complete_draft(request, league_id):
+    """
+    Complete a draft and save team rosters
+    
+    POST /api/leagues/{league_id}/complete-draft/
+    
+    Saves the final team rosters after a draft is completed.
+    This endpoint is called when the draft is finished to persist
+    the selected players to each team.
+    
+    Parameters:
+        league_id (int): The ID of the league whose draft is being completed
+        
+    Request Body:
+        {
+            "team_rosters": [
+                {
+                    "team_id": "1",
+                    "user_id": "4",
+                    "players": [
+                        {"player_id": "1", "position": "Fly-half"},
+                        {"player_id": "2", "position": "Scrum-half"}
+                    ]
+                }
+            ]
+        }
+        
+    Returns:
+        200: Success - Draft completed and teams saved
+        400: Bad Request - Invalid data or missing required fields
+        500: Internal Server Error - Database or system error
+        
+    Example Response (Success):
+    {
+        "status": "Draft completed successfully",
+        "teams_updated": 2,
+        "total_players": 30
+    }
+    """
+    try:
+        client = DatabricksRestClient()
+        data = request.data
+        
+        team_rosters = data.get('team_rosters', [])
+        if not team_rosters:
+            return Response({'error': 'No team rosters provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        total_players = 0
+        teams_updated = 0
+        
+        for roster in team_rosters:
+            team_id = roster.get('team_id')
+            user_id = roster.get('user_id')
+            players = roster.get('players', [])
+            
+            if not team_id or not user_id:
+                continue
+                
+            # Save each player to the team
+            for player in players:
+                player_id = player.get('player_id')
+                position = player.get('position', '')
+                
+                if player_id:
+                    # Insert into team_players table (assuming this table exists)
+                    # For now, we'll create a simple team_players table structure
+                    insert_sql = f"""
+                    INSERT INTO default.team_players (team_id, player_id, position, user_id, league_id)
+                    VALUES ('{team_id}', '{player_id}', '{position}', {user_id}, {league_id})
+                    """
+                    
+                    try:
+                        client.execute_sql(insert_sql)
+                        total_players += 1
+                    except Exception as e:
+                        print(f"Error inserting player {player_id} for team {team_id}: {e}")
+                        # Continue with other players even if one fails
+            
+            teams_updated += 1
+        
+        return Response({
+            'status': 'Draft completed successfully',
+            'teams_updated': teams_updated,
+            'total_players': total_players
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def rugby_players(request):

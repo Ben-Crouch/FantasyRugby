@@ -1,5 +1,5 @@
 from django.urls import path
-from .rest_views import user_leagues, league_teams, join_league, team_statistics, rugby_players
+from .rest_views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft
 from .admin_views import remove_team_from_league, get_league_admin, is_user_league_admin
 from .authentication import register, login, refresh_token, verify_token, logout
 
@@ -10,6 +10,7 @@ urlpatterns = [
     path('league-teams/', league_teams, name='league_teams'),
     path('team-statistics/', team_statistics, name='team_statistics'),
     path('rugby-players/', rugby_players, name='rugby_players'),
+    path('leagues/<int:league_id>/complete-draft/', complete_draft, name='complete_draft'),
     # League admin endpoints
     path('admin/leagues/<int:league_id>/teams/<int:team_id>/remove/', remove_team_from_league, name='remove_team'),
     path('admin/leagues/<int:league_id>/admin-info/', get_league_admin, name='get_league_admin'),
