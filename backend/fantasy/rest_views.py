@@ -560,14 +560,18 @@ def get_team_players(request, team_id):
         
         result = client.execute_sql(select_sql)
         
+        print(f"DEBUG: get_team_players SQL result: {result}")
+        
         if result.get('status', {}).get('state') != 'SUCCEEDED':
             return Response({'error': 'Failed to retrieve team players'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         players = []
         # Check both possible data structures
         data_rows = result.get('result', {}).get('data', []) or result.get('result', {}).get('data_array', [])
+        print(f"DEBUG: get_team_players data_rows: {data_rows}")
+        
         for row in data_rows:
-            players.append({
+            player_data = {
                 'id': row[0],
                 'player_id': row[1],
                 'position': row[2],
@@ -578,7 +582,9 @@ def get_team_players(request, team_id):
                 'league_id': row[7],
                 'created_at': row[8],
                 'updated_at': row[9]
-            })
+            }
+            print(f"DEBUG: get_team_players player: {player_data}")
+            players.append(player_data)
         
         return Response({
             'team_id': team_id,
