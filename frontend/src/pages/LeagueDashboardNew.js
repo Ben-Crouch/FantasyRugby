@@ -33,83 +33,27 @@ const LeagueDashboard = () => {
       setError(null);
       
       try {
-        console.log('DEBUG: location.state:', location.state);
-        console.log('DEBUG: location.pathname:', location.pathname);
-        console.log('DEBUG: location.search:', location.search);
-        
         let leagueId = location.state?.leagueId;
-        console.log('DEBUG: leagueId from location.state:', leagueId);
-        
-        // Also try to get league ID from URL params if available
-        if (!leagueId) {
-          const urlParams = new URLSearchParams(window.location.search);
-          const urlLeagueId = urlParams.get('leagueId');
-          if (urlLeagueId) {
-            leagueId = parseInt(urlLeagueId);
-            console.log('Using league ID from URL params:', leagueId);
-          }
-        }
-        
-        // If still no league ID, try to get it from localStorage as a fallback
-        if (!leagueId) {
-          const storedLeagueId = localStorage.getItem('lastSelectedLeagueId');
-          if (storedLeagueId) {
-            leagueId = parseInt(storedLeagueId);
-            console.log('Using league ID from localStorage:', leagueId);
-          }
-        }
         
         if (!leagueId) {
-          console.log('No league ID provided, using fallback');
-          setLoading(true); // Show loading while finding fallback league
+          console.error('No league ID provided in location state');
           const allLeagues = await leaguesAPI.getLeagues();
           if (allLeagues && allLeagues.length > 0) {
-            // Try to find a league where the user is actually a member
-            const userLeagues = allLeagues.filter(league => 
-              league.teams && league.teams.some(team => 
-                team.team_owner === user?.id || team.team_owner_user_id === user?.id
-              )
-            );
-            
-            if (userLeagues.length > 0) {
-              leagueId = userLeagues[0].id;
-              console.log('Using fallback league ID where user is a member:', leagueId);
-            } else {
-              // Fallback to any league with teams
-              const leaguesWithTeams = allLeagues.filter(league => league.teams && league.teams.length > 0);
-              if (leaguesWithTeams.length > 0) {
-                leagueId = leaguesWithTeams[0].id;
-                console.log('Using fallback league ID with teams:', leagueId);
-              } else {
-                leagueId = allLeagues[0].id;
-                console.log('Using fallback league ID (first available):', leagueId);
-              }
-            }
+            leagueId = allLeagues[0].id;
+            console.log('Using fallback league ID:', leagueId);
           } else {
-            console.log('No leagues available, redirecting to league selection');
-            navigate('/league-selection');
+            setError('No league selected. Please go back to league selection.');
             return;
           }
         }
         
-        // Store the league ID in localStorage for future use
-        if (leagueId) {
-          localStorage.setItem('lastSelectedLeagueId', leagueId.toString());
-          console.log('Stored league ID in localStorage:', leagueId);
-        }
-        
         // Fetch league data
-        console.log('DEBUG: Fetching leagues for leagueId:', leagueId);
         const leagues = await leaguesAPI.getLeagues();
-        console.log('DEBUG: All leagues:', leagues);
-        console.log('DEBUG: Leagues API response type:', typeof leagues, 'is array:', Array.isArray(leagues));
         const league = leagues.find(l => l.id === leagueId);
-        console.log('DEBUG: Found league:', league);
         
         if (league) {
           setLeagueData(league);
         } else {
-          console.log('DEBUG: League not found, using fallback data');
           setLeagueData({
             id: leagueId,
             name: 'Fantasy League',
@@ -121,12 +65,8 @@ const LeagueDashboard = () => {
         }
         
         // Fetch teams in the league
-        console.log('DEBUG: Fetching teams for leagueId:', leagueId);
         const allTeams = await teamsAPI.getTeams();
-        console.log('DEBUG: All teams:', allTeams);
-        console.log('DEBUG: Teams API response type:', typeof allTeams, 'is array:', Array.isArray(allTeams));
         const teamsData = allTeams.filter(team => team.league_id === leagueId);
-        console.log('DEBUG: Teams for this league:', teamsData);
         setTeams(teamsData || []);
         
         // Check if draft is complete by checking if any team has players
@@ -135,10 +75,8 @@ const LeagueDashboard = () => {
             const teamWithPlayers = await Promise.all(
               teamsData.map(async (team) => {
                 try {
-                  const response = await teamsAPI.getTeamPlayers(team.id);
-                  const players = response?.players || [];
-                  console.log(`DEBUG: Team ${team.id} has ${players.length} players`);
-                  return players.length > 0;
+                  const players = await teamsAPI.getTeamPlayers(team.id);
+                  return players && players.length > 0;
                 } catch (error) {
                   console.warn(`Could not fetch players for team ${team.id}:`, error);
                   return false;
@@ -147,28 +85,20 @@ const LeagueDashboard = () => {
             );
             
             const hasPlayers = teamWithPlayers.some(hasPlayers => hasPlayers);
-            console.log('DEBUG: Draft completion check - teamWithPlayers:', teamWithPlayers);
             console.log('DEBUG: Draft completion check - hasPlayers:', hasPlayers);
             setDraftComplete(hasPlayers);
-            console.log('DEBUG: Draft completion check - setDraftComplete to:', hasPlayers);
             
             // Auto-select user's team if available
             if (user && user.id) {
-              console.log('DEBUG: Looking for user team - user.id:', user.id);
-              console.log('DEBUG: Available teams:', teamsData);
               const userTeam = teamsData.find(team => team.team_owner === user.id);
-              console.log('DEBUG: Found userTeam by team_owner:', userTeam);
               if (userTeam) {
                 setSelectedTeam(userTeam);
                 loadTeamPlayers(userTeam.id);
               } else {
                 const userTeamByUserId = teamsData.find(team => team.team_owner_user_id === user.id);
-                console.log('DEBUG: Found userTeam by team_owner_user_id:', userTeamByUserId);
                 if (userTeamByUserId) {
                   setSelectedTeam(userTeamByUserId);
                   loadTeamPlayers(userTeamByUserId.id);
-                } else {
-                  console.log('DEBUG: No team found for user');
                 }
               }
             }
@@ -201,8 +131,7 @@ const LeagueDashboard = () => {
         
       } catch (err) {
         console.error('Failed to load league dashboard data:', err);
-        console.error('Error details:', err.message, err.stack);
-        setError(`Failed to load league data: ${err.message}. Please try again.`);
+        setError('Failed to load league data. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -212,16 +141,11 @@ const LeagueDashboard = () => {
   }, [location.state, user]);
 
   const loadTeamPlayers = async (teamId) => {
-    console.log('DEBUG: loadTeamPlayers called with teamId:', teamId);
     setLoadingPlayers(true);
     try {
-      const response = await teamsAPI.getTeamPlayers(teamId);
-      console.log('DEBUG: loadTeamPlayers - API response:', response);
-      const players = response?.players || [];
-      console.log('DEBUG: loadTeamPlayers - extracted players:', players);
-      console.log('DEBUG: loadTeamPlayers - players type:', typeof players, 'is array:', Array.isArray(players));
-      setTeamPlayers(players);
-      setLocalTeamPlayers(players);
+      const players = await teamsAPI.getTeamPlayers(teamId);
+      setTeamPlayers(players || []);
+      setLocalTeamPlayers(players || []);
     } catch (error) {
       console.error('Failed to load team players:', error);
     } finally {
@@ -395,7 +319,6 @@ const LeagueDashboard = () => {
       <SwapModal
         showSwapModal={showSwapModal}
         swapData={swapData}
-        setSwapData={setSwapData}
         onConfirmSwap={confirmSwap}
         onCancelSwap={cancelSwap}
       />

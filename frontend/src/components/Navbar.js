@@ -55,6 +55,13 @@ const Navbar = () => {
 
         {isAuthenticated ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Link 
+              to="/my-leagues" 
+              className="btn btn-outline btn-small"
+              style={{ textDecoration: 'none' }}
+            >
+              My Leagues
+            </Link>
             <span style={{ color: 'var(--black)', fontWeight: '500' }}>
               Welcome, {user?.username || user?.email}
             </span>

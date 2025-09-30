@@ -59,14 +59,19 @@ const apiRequest = async (endpoint, options = {}) => {
   };
 
   try {
+    console.log('DEBUG: Making API request to:', url);
     const response = await fetch(url, config);
+    console.log('DEBUG: API response status:', response.status, response.statusText);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('DEBUG: API error response:', errorData);
       throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log('DEBUG: API response data:', data);
+    return data;
   } catch (error) {
     console.error('API request failed:', error);
     throw error;
@@ -180,6 +185,13 @@ export const teamsAPI = {
 
   getTeamPlayers: async (teamId) => {
     return apiRequest(`/league-teams/${teamId}/players/`);
+  },
+
+  updatePlayerPosition: async (teamId, playerId, positionData) => {
+    return apiRequest(`/league-teams/${teamId}/players/${playerId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(positionData),
+    });
   },
 };
 
