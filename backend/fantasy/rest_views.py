@@ -417,7 +417,12 @@ def complete_draft(request, league_id):
         client = DatabricksRestClient()
         data = request.data
         
+        # Debug logging
+        print(f"DEBUG: Complete draft request data: {data}")
+        
         team_rosters = data.get('team_rosters', [])
+        print(f"DEBUG: Team rosters: {team_rosters}")
+        
         if not team_rosters:
             return Response({'error': 'No team rosters provided'}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -429,24 +434,33 @@ def complete_draft(request, league_id):
             user_id = roster.get('user_id')
             players = roster.get('players', [])
             
+            print(f"DEBUG: Processing roster - team_id: {team_id}, user_id: {user_id}, players: {players}")
+            
             if not team_id or not user_id:
+                print(f"DEBUG: Skipping roster - missing team_id or user_id")
                 continue
                 
             # Save each player to the team
             for player in players:
-                player_id = player.get('player_id')
+                player_id = player.get('player_id') or player.get('id')  # Try both field names
                 position = player.get('position', '')
+                fantasy_position = player.get('fantasy_position', position)  # Use fantasy_position if available
+                is_starting = player.get('is_starting', True)  # Default to starting
+                
+                print(f"DEBUG: Processing player - player_id: {player_id}, position: {position}, fantasy_position: {fantasy_position}, is_starting: {is_starting}")
                 
                 if player_id:
-                    # Insert into team_players table (assuming this table exists)
-                    # For now, we'll create a simple team_players table structure
+                    # Insert into team_players table with new columns
                     insert_sql = f"""
-                    INSERT INTO default.team_players (team_id, player_id, position, user_id, league_id)
-                    VALUES ('{team_id}', '{player_id}', '{position}', {user_id}, {league_id})
+                    INSERT INTO default.team_players (team_id, player_id, position, fantasy_position, is_starting, original_position, user_id, league_id, created_at, updated_at)
+                    VALUES ('{team_id}', '{player_id}', '{position}', '{fantasy_position}', {str(is_starting).lower()}, '{position}', {user_id}, {league_id}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """
                     
+                    print(f"DEBUG: Executing SQL: {insert_sql}")
+                    
                     try:
-                        client.execute_sql(insert_sql)
+                        result = client.execute_sql(insert_sql)
+                        print(f"DEBUG: SQL result: {result}")
                         total_players += 1
                     except Exception as e:
                         print(f"Error inserting player {player_id} for team {team_id}: {e}")
@@ -497,3 +511,141 @@ def rugby_players(request):
             'error': f'Rugby players operation failed: {str(e)}',
             'details': error_details
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_team_players(request, team_id):
+    """
+    Get players for a specific team
+    
+    GET /api/league-teams/{team_id}/players/
+    
+    Retrieves all players that have been drafted to a specific team.
+    
+    Parameters:
+        team_id (int): The ID of the team to get players for
+        
+    Returns:
+        200: Success - List of players for the team
+        404: Not Found - Team not found
+        500: Internal Server Error - Database or system error
+        
+    Example Response (Success):
+    {
+        "team_id": "1",
+        "players": [
+            {
+                "id": 1,
+                "player_id": "123",
+                "position": "Fly-half",
+                "user_id": 4,
+                "league_id": 12,
+                "created_at": "2025-09-30T10:30:00Z"
+            }
+        ],
+        "total_players": 1
+    }
+    """
+    try:
+        client = DatabricksRestClient()
+        
+        # Get players for the team
+        select_sql = f"""
+        SELECT id, player_id, position, fantasy_position, is_starting, original_position, user_id, league_id, created_at, updated_at
+        FROM default.team_players 
+        WHERE team_id = '{team_id}'
+        ORDER BY created_at ASC
+        """
+        
+        result = client.execute_sql(select_sql)
+        
+        if result.get('status', {}).get('state') != 'SUCCEEDED':
+            return Response({'error': 'Failed to retrieve team players'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        players = []
+        # Check both possible data structures
+        data_rows = result.get('result', {}).get('data', []) or result.get('result', {}).get('data_array', [])
+        for row in data_rows:
+            players.append({
+                'id': row[0],
+                'player_id': row[1],
+                'position': row[2],
+                'fantasy_position': row[3],
+                'is_starting': row[4],
+                'original_position': row[5],
+                'user_id': row[6],
+                'league_id': row[7],
+                'created_at': row[8],
+                'updated_at': row[9]
+            })
+        
+        return Response({
+            'team_id': team_id,
+            'players': players,
+            'total_players': len(players)
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT'])
+@permission_classes([AllowAny])
+def update_player_position(request, team_id, player_id):
+    """
+    Update a player's position (starting/bench) and fantasy position
+    
+    PUT /api/league-teams/{team_id}/players/{player_id}/
+    
+    Updates a player's fantasy position and starting status.
+    
+    Parameters:
+        team_id (int): The ID of the team
+        player_id (int): The ID of the player to update
+        
+    Request Body:
+        {
+            "fantasy_position": "Prop",  // New fantasy position
+            "is_starting": true          // Whether player is starting or on bench
+        }
+        
+    Returns:
+        200: Success - Player updated
+        404: Not Found - Player not found
+        500: Internal Server Error - Database or system error
+    """
+    try:
+        client = DatabricksRestClient()
+        
+        fantasy_position = request.data.get('fantasy_position')
+        is_starting = request.data.get('is_starting', True)
+        
+        if not fantasy_position:
+            return Response({'error': 'fantasy_position is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update the player's position
+        update_sql = f"""
+        UPDATE default.team_players 
+        SET 
+            fantasy_position = '{fantasy_position}',
+            is_starting = {str(is_starting).lower()},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE team_id = '{team_id}' AND player_id = '{player_id}'
+        """
+        
+        result = client.execute_sql(update_sql)
+        
+        if result.get('status', {}).get('state') != 'SUCCEEDED':
+            return Response({'error': 'Failed to update player position'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response({
+            'message': 'Player position updated successfully',
+            'team_id': team_id,
+            'player_id': player_id,
+            'fantasy_position': fantasy_position,
+            'is_starting': is_starting
+        })
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -23,9 +23,9 @@ export const AuthProvider = ({ children }) => {
         const storedToken = localStorage.getItem('access_token');
         if (storedToken) {
           // Verify token is still valid
-          const userData = await authAPI.verifyToken(storedToken);
-          if (userData) {
-            setUser(userData);
+          const response = await authAPI.verifyToken(storedToken);
+          if (response && response.success && response.user) {
+            setUser(response.user);
             setToken(storedToken);
           } else {
             // Token is invalid, clear it

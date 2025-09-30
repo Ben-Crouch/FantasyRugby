@@ -25,12 +25,22 @@ const Draft = () => {
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [draftComplete, setDraftComplete] = useState(false);
 
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Debug logging
+  console.log('Draft component - User:', user);
+  console.log('Draft component - Auth Loading:', authLoading);
+  console.log('Draft component - Location state:', location.state);
+
   useEffect(() => {
     const loadData = async () => {
+      // Wait for authentication to complete
+      if (authLoading) {
+        return;
+      }
+      
       setLoading(true);
       setError(null);
       
@@ -82,6 +92,8 @@ const Draft = () => {
           }
         } else if (!user || !user.id) {
           console.warn('User not authenticated or user ID missing');
+          console.warn('User object:', user);
+          console.warn('User ID:', user?.id);
           setIsAdmin(false);
           setError('You must be logged in to access the draft');
           return;
@@ -96,7 +108,7 @@ const Draft = () => {
     };
 
     loadData();
-  }, [location.state, user]);
+  }, [location.state, user, authLoading]);
 
   // Select player function
   const selectPlayer = (player, isAutoPick = false) => {
@@ -236,12 +248,18 @@ const Draft = () => {
     try {
       setLoading(true);
       
+      // Debug logging
+      console.log('DEBUG: selectedPlayers:', selectedPlayers);
+      console.log('DEBUG: teams:', teams);
+      
       // Prepare team rosters for saving
       const teamRosters = teams.map(team => ({
         team_id: team.id,
-        user_id: team.user_id,
+        user_id: team.team_owner_user_id,
         players: selectedPlayers[team.id] || []
       }));
+      
+      console.log('DEBUG: teamRosters being sent:', teamRosters);
       
       // Call the complete draft API using the service
       const result = await leaguesAPI.completeDraft(leagueData.id, teamRosters);
@@ -385,6 +403,17 @@ const Draft = () => {
     
     return needed;
   };
+
+  if (authLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '4rem' }}>
+        <div className="spinner"></div>
+        <p style={{ marginTop: '1rem', color: 'var(--black)' }}>
+          Authenticating...
+        </p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
