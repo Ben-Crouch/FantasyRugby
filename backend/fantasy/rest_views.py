@@ -1037,3 +1037,251 @@ def process_waivers(request, league_id):
             'error': str(e),
             'traceback': traceback.format_exc()
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def trade_proposals(request, league_id):
+    """
+    Handle trade proposals
+    
+    GET: Get all trade proposals for a league
+    POST: Create a new trade proposal
+    """
+    client = DatabricksRestClient()
+    
+    if request.method == 'GET':
+        try:
+            # Get all trades for this league
+            trades_sql = f"""
+            SELECT id, league_id, from_team_id, to_team_id, from_user_id, to_user_id, 
+                   status, proposed_at, responded_at, created_at, updated_at
+            FROM default.trades 
+            WHERE league_id = {league_id}
+            ORDER BY proposed_at DESC
+            """
+            
+            result = client.execute_sql(trades_sql)
+            
+            if not result or 'result' not in result:
+                return Response({'error': 'Could not load trades'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            trades_data = result['result'].get('data_array', [])
+            
+            # Convert to list of dicts
+            trades = []
+            for trade in trades_data:
+                trade_id = trade[0]
+                
+                # Get players involved in this trade
+                players_sql = f"""
+                SELECT id, trade_id, team_player_id, from_team, created_at
+                FROM default.trade_players
+                WHERE trade_id = '{trade_id}'
+                """
+                
+                players_result = client.execute_sql(players_sql)
+                players_data = players_result['result'].get('data_array', []) if players_result and 'result' in players_result else []
+                
+                trade_obj = {
+                    'id': trade[0],
+                    'league_id': trade[1],
+                    'from_team_id': trade[2],
+                    'to_team_id': trade[3],
+                    'from_user_id': trade[4],
+                    'to_user_id': trade[5],
+                    'status': trade[6],
+                    'proposed_at': trade[7],
+                    'responded_at': trade[8],
+                    'created_at': trade[9],
+                    'updated_at': trade[10],
+                    'players': [
+                        {
+                            'id': p[0],
+                            'trade_id': p[1],
+                            'team_player_id': p[2],
+                            'from_team': p[3],
+                            'created_at': p[4]
+                        } for p in players_data
+                    ]
+                }
+                trades.append(trade_obj)
+            
+            return Response(trades)
+            
+        except Exception as e:
+            import traceback
+            return Response({
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    elif request.method == 'POST':
+        try:
+            data = request.data
+            from_team_id = data.get('from_team_id')
+            to_team_id = data.get('to_team_id')
+            from_user_id = data.get('from_user_id')
+            to_user_id = data.get('to_user_id')
+            from_players = data.get('from_players', [])  # List of team_player IDs
+            to_players = data.get('to_players', [])  # List of team_player IDs
+            
+            if not all([from_team_id, to_team_id, from_user_id, to_user_id]):
+                return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not from_players or not to_players:
+                return Response({'error': 'Trade must include players from both teams'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Generate trade ID
+            import uuid
+            trade_id = str(uuid.uuid4())
+            
+            # Insert trade
+            insert_trade_sql = f"""
+            INSERT INTO default.trades 
+            (id, league_id, from_team_id, to_team_id, from_user_id, to_user_id, status, proposed_at, created_at, updated_at)
+            VALUES (
+                '{trade_id}',
+                {league_id},
+                '{from_team_id}',
+                '{to_team_id}',
+                {from_user_id},
+                {to_user_id},
+                'PENDING',
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            )
+            """
+            
+            client.execute_sql(insert_trade_sql)
+            
+            # Insert trade players
+            for player_id in from_players:
+                player_trade_id = str(uuid.uuid4())
+                insert_player_sql = f"""
+                INSERT INTO default.trade_players 
+                (id, trade_id, team_player_id, from_team, created_at)
+                VALUES (
+                    '{player_trade_id}',
+                    '{trade_id}',
+                    '{player_id}',
+                    true,
+                    CURRENT_TIMESTAMP
+                )
+                """
+                client.execute_sql(insert_player_sql)
+            
+            for player_id in to_players:
+                player_trade_id = str(uuid.uuid4())
+                insert_player_sql = f"""
+                INSERT INTO default.trade_players 
+                (id, trade_id, team_player_id, from_team, created_at)
+                VALUES (
+                    '{player_trade_id}',
+                    '{trade_id}',
+                    '{player_id}',
+                    false,
+                    CURRENT_TIMESTAMP
+                )
+                """
+                client.execute_sql(insert_player_sql)
+            
+            return Response({
+                'message': 'Trade proposed successfully',
+                'trade_id': trade_id
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            import traceback
+            return Response({
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def respond_to_trade(request, trade_id):
+    """
+    Accept or reject a trade proposal
+    """
+    try:
+        client = DatabricksRestClient()
+        action = request.data.get('action')  # 'ACCEPT' or 'REJECT'
+        
+        if action not in ['ACCEPT', 'REJECT']:
+            return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if action == 'ACCEPT':
+            # Get trade details
+            trade_sql = f"""
+            SELECT from_team_id, to_team_id
+            FROM default.trades
+            WHERE id = '{trade_id}'
+            """
+            
+            trade_result = client.execute_sql(trade_sql)
+            if not trade_result or 'result' not in trade_result:
+                return Response({'error': 'Trade not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            trade_data = trade_result['result'].get('data_array', [])
+            if not trade_data:
+                return Response({'error': 'Trade not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            from_team_id = trade_data[0][0]
+            to_team_id = trade_data[0][1]
+            
+            # Get players involved in trade
+            players_sql = f"""
+            SELECT team_player_id, from_team
+            FROM default.trade_players
+            WHERE trade_id = '{trade_id}'
+            """
+            
+            players_result = client.execute_sql(players_sql)
+            players_data = players_result['result'].get('data_array', []) if players_result and 'result' in players_result else []
+            
+            # Update team ownership for each player
+            for player_data in players_data:
+                team_player_id = player_data[0]
+                is_from_team = player_data[1]
+                
+                # Transfer player to opposite team
+                new_team_id = to_team_id if is_from_team else from_team_id
+                
+                # Note: This assumes team_players has a team_id column
+                # You may need to adjust based on your actual schema
+                update_player_sql = f"""
+                UPDATE default.team_players
+                SET team_id = '{new_team_id}', updated_at = CURRENT_TIMESTAMP
+                WHERE id = '{team_player_id}'
+                """
+                client.execute_sql(update_player_sql)
+            
+            # Update trade status
+            update_trade_sql = f"""
+            UPDATE default.trades
+            SET status = 'ACCEPTED', responded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = '{trade_id}'
+            """
+            client.execute_sql(update_trade_sql)
+            
+            return Response({'message': 'Trade accepted successfully'})
+        
+        else:  # REJECT
+            update_trade_sql = f"""
+            UPDATE default.trades
+            SET status = 'REJECTED', responded_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = '{trade_id}'
+            """
+            client.execute_sql(update_trade_sql)
+            
+            return Response({'message': 'Trade rejected successfully'})
+        
+    except Exception as e:
+        import traceback
+        return Response({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

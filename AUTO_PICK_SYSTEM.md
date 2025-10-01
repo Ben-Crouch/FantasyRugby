@@ -178,3 +178,4 @@ const randomPlayer = available[Math.floor(Math.random() * Math.min(10, available
 
 For production deployment with multiple users across different computers, consider adding WebSocket support for real-time draft synchronization and server-side active user tracking.
 
+

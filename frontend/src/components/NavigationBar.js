@@ -154,6 +154,19 @@ const NavigationBar = ({
         >
           Waivers
         </button>
+        <button
+          onClick={() => setActiveTab('trade')}
+          style={{
+            padding: '0.5rem 1rem',
+            border: 'none',
+            backgroundColor: activeTab === 'trade' ? 'var(--primary-orange)' : 'transparent',
+            color: activeTab === 'trade' ? 'white' : 'var(--primary-orange)',
+            cursor: 'pointer',
+            borderRadius: '4px'
+          }}
+        >
+          Trade
+        </button>
       </div>
     </div>
   );

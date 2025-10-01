@@ -172,6 +172,24 @@ export const leaguesAPI = {
   getWaiverClaims: async (leagueId) => {
     return apiRequest(`/leagues/${leagueId}/waiver-claims/`);
   },
+
+  getTrades: async (leagueId) => {
+    return apiRequest(`/leagues/${leagueId}/trades/`);
+  },
+
+  proposeTrade: async (leagueId, tradeData) => {
+    return apiRequest(`/leagues/${leagueId}/trades/`, {
+      method: 'POST',
+      body: JSON.stringify(tradeData),
+    });
+  },
+
+  respondToTrade: async (tradeId, action) => {
+    return apiRequest(`/trades/${tradeId}/respond/`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
+  },
 };
 
 // Teams API

@@ -23,3 +23,4 @@ EXPOSE 8000
 
 # Run the application
 CMD ["gunicorn", "rugby_fantasy.wsgi", "--bind", "0.0.0.0:8000"]
+
