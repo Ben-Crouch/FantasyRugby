@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { leaguesAPI } from '../services/api';
@@ -15,13 +15,10 @@ import DraftControls from '../components/draft/DraftControls';
 import DraftStatus from '../components/draft/DraftStatus';
 import PlayerFilters from '../components/draft/PlayerFilters';
 import PlayerList from '../components/draft/PlayerList';
-import MyTeamView from '../components/draft/MyTeamView';
-import PlayerConfirmModal from '../components/draft/PlayerConfirmModal';
-import DraftOrderSidebar from '../components/draft/DraftOrderSidebar';
+import TeamRoster from '../components/draft/TeamRoster';
 
 const Draft = () => {
   const [activeTab, setActiveTab] = useState('pick'); // 'pick' or 'team'
-  const [selectedPlayerForConfirm, setSelectedPlayerForConfirm] = useState(null);
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -41,16 +38,15 @@ const Draft = () => {
     currentPick,
     currentTeam,
     timeRemaining,
+    draftOrder,
     selectedPlayers,
     draftComplete,
     setDraftComplete,
     handleStartDraft,
     handleShuffleDraft,
     handleSelectPlayer,
-    markUserActive,
-    markUserInactive,
     totalPicks
-  } = useDraftState(teams, players);
+  } = useDraftState(teams);
 
   // Player filtering
   const {
@@ -59,38 +55,7 @@ const Draft = () => {
     setSelectedPosition,
     searchName,
     setSearchName
-  } = usePlayerFilters(players, selectedPlayers, currentTeam?.id);
-
-  // Mark current user as active when component mounts
-  useEffect(() => {
-    if (user && user.id) {
-      markUserActive(user.id);
-      
-      // Mark inactive when component unmounts
-      return () => markUserInactive(user.id);
-    }
-  }, [user, markUserActive, markUserInactive]);
-
-  // Check draft status and auto-start if LIVE
-  useEffect(() => {
-    const checkAndStartDraft = async () => {
-      if (!leagueId || !leagueData) return;
-      
-      try {
-        const statusResult = await leaguesAPI.getDraftStatus(leagueId);
-        if (statusResult.draft_status === 'LIVE' && !draftStarted) {
-          // Draft is live in the database but not started locally
-          // Auto-start the local draft
-          console.log('Draft is LIVE in database, starting locally...');
-          handleStartDraft();
-        }
-      } catch (error) {
-        console.error('Error checking draft status:', error);
-      }
-    };
-    
-    checkAndStartDraft();
-  }, [leagueId, leagueData, draftStarted, handleStartDraft]);
+  } = usePlayerFilters(players, selectedPlayers);
 
   // Handlers
   const handleBackToLeague = () => {
@@ -99,108 +64,18 @@ const Draft = () => {
 
   const handlePlayerSelect = (player) => {
     if (!currentTeam || !user) return;
-    const teamUserId = currentTeam.user_id || currentTeam.team_owner_user_id;
-    if (teamUserId !== user.id.toString()) return;
-    // Show confirmation modal
-    setSelectedPlayerForConfirm(player);
+    if (currentTeam.user_id !== user.id.toString()) return;
+    handleSelectPlayer(player, currentTeam.id);
   };
-
-  const handleConfirmSelection = () => {
-    if (selectedPlayerForConfirm && currentTeam) {
-      handleSelectPlayer(selectedPlayerForConfirm, currentTeam.id);
-      setSelectedPlayerForConfirm(null);
-    }
-  };
-
-  const handleCancelSelection = () => {
-    setSelectedPlayerForConfirm(null);
-  };
-
-  const handleStartDraftWithAPI = async () => {
-    try {
-      // Call backend API to update draft status to LIVE
-      await leaguesAPI.startDraft(leagueId, user.id);
-      // Then start the draft locally
-      handleStartDraft();
-    } catch (error) {
-      console.error('Error starting draft:', error);
-      alert('Failed to start draft. Please try again.');
-    }
-  };
-
-  const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const handleCompleteDraft = async () => {
-    if (isSavingDraft) return; // Prevent duplicate submissions
-    
     try {
-      setIsSavingDraft(true);
-      
-      // Prepare team rosters for saving with proper starting/bench assignments
-      const requiredPositions = {
-        'Prop': 1,
-        'Hooker': 1,
-        'Lock': 1,
-        'Back Row': 2,
-        'Scrum-half': 1,
-        'Fly-half': 1,
-        'Centre': 1,
-        'Back Three': 2
-      };
-
-      const teamRosters = teams.map(team => {
-        const teamPlayers = selectedPlayers[team.id] || [];
-        
-        // Separate players into starting and bench based on position requirements
-        const startingPlayers = [];
-        const benchPlayers = [];
-        
-        teamPlayers.forEach(player => {
-          const position = player.fantasy_position;
-          const required = requiredPositions[position] || 0;
-          const currentCount = startingPlayers.filter(p => p.fantasy_position === position).length;
-          
-          if (currentCount < required) {
-            startingPlayers.push({
-              player_id: player.id,
-              id: player.id,
-              name: player.name,
-              position: player.position,
-              fantasy_position: player.fantasy_position,
-              team: player.team,
-              is_starting: true
-            });
-          } else {
-            benchPlayers.push({
-              player_id: player.id,
-              id: player.id,
-              name: player.name,
-              position: player.position,
-              fantasy_position: player.fantasy_position,
-              team: player.team,
-              is_starting: false
-            });
-          }
-        });
-        
-        const allPlayers = [...startingPlayers, ...benchPlayers];
-        
-        return {
-          team_id: team.id,
-          user_id: team.user_id || team.team_owner_user_id,
-          players: allPlayers
-        };
-      });
-      
-      console.log('Saving team rosters:', teamRosters);
-      
       // Save all team rosters to the backend
-      await leaguesAPI.completeDraft(leagueId, teamRosters);
+      await leaguesAPI.completeDraft(leagueId, selectedPlayers);
       navigate('/league-dashboard', { state: { leagueId } });
     } catch (error) {
       console.error('Error completing draft:', error);
       alert('Failed to save draft results. Please try again.');
-      setIsSavingDraft(false);
     }
   };
 
@@ -236,30 +111,15 @@ const Draft = () => {
   }
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <DraftHeader
         leagueData={leagueData}
         teams={teams}
         onBackToLeague={handleBackToLeague}
       />
 
-      <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
-        {/* Left Sidebar - Draft Order */}
-        {teams.length > 0 && (
-          <div style={{ width: '280px', flexShrink: 0 }}>
-            <DraftOrderSidebar
-              teams={teams}
-              currentTeam={currentTeam}
-              selectedPlayers={selectedPlayers}
-              user={user}
-            />
-          </div>
-        )}
-
-        {/* Main Content */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Tab Navigation */}
-          <div className="card" style={{ marginBottom: '2rem' }}>
+      {/* Tab Navigation */}
+      <div className="card" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', gap: '1rem', borderBottom: '2px solid var(--light-gray)' }}>
           <button
             onClick={() => setActiveTab('pick')}
@@ -293,7 +153,7 @@ const Draft = () => {
               transition: 'all 0.2s'
             }}
           >
-            My Team
+            Team Rosters
           </button>
         </div>
       </div>
@@ -303,7 +163,7 @@ const Draft = () => {
         <DraftControls
           draftStarted={draftStarted}
           isAdmin={isAdmin}
-          onStartDraft={handleStartDraftWithAPI}
+          onStartDraft={handleStartDraft}
           onShuffleDraft={handleShuffleDraft}
           disabled={teams.length === 0}
         />
@@ -318,8 +178,6 @@ const Draft = () => {
           timeRemaining={timeRemaining}
           totalPicks={totalPicks}
           user={user}
-          selectedPlayers={selectedPlayers}
-          teams={teams}
         />
       )}
 
@@ -343,21 +201,10 @@ const Draft = () => {
         </div>
       )}
 
-      {/* My Team Tab */}
+      {/* Team Rosters Tab */}
       {activeTab === 'team' && (
-        <MyTeamView 
-          teams={teams} 
-          selectedPlayers={selectedPlayers}
-          user={user}
-        />
+        <TeamRoster teams={teams} selectedPlayers={selectedPlayers} />
       )}
-
-      {/* Player Confirmation Modal */}
-      <PlayerConfirmModal
-        player={selectedPlayerForConfirm}
-        onConfirm={handleConfirmSelection}
-        onCancel={handleCancelSelection}
-      />
 
       {/* Draft Complete Modal */}
       {draftComplete && (
@@ -389,31 +236,42 @@ const Draft = () => {
               marginBottom: '2rem',
               fontSize: '1.1rem' 
             }}>
-              All teams have been drafted. Click below to save the results and return to the league dashboard.
+              All teams have been drafted. You can now view the league table and manage your team.
             </p>
-            <button
-              onClick={handleCompleteDraft}
-              disabled={isSavingDraft}
-              style={{
-                backgroundColor: isSavingDraft ? 'var(--light-gray)' : 'var(--primary-orange)',
-                color: 'white',
-                border: 'none',
-                padding: '1rem 2rem',
-                borderRadius: '8px',
-                fontSize: '1.1rem',
-                fontWeight: 'bold',
-                cursor: isSavingDraft ? 'not-allowed' : 'pointer',
-                opacity: isSavingDraft ? 0.6 : 1,
-                minWidth: '250px'
-              }}
-            >
-              {isSavingDraft ? '💾 Saving...' : '✅ Complete & Go to Dashboard'}
-            </button>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button
+                onClick={handleCompleteDraft}
+                style={{
+                  backgroundColor: 'var(--primary-orange)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Complete Draft & Save Teams
+              </button>
+              <button
+                onClick={() => setDraftComplete(false)}
+                style={{
+                  backgroundColor: 'var(--light-gray)',
+                  color: 'var(--black)',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Continue Drafting
+              </button>
+            </div>
           </div>
         </div>
       )}
-        </div>
-      </div>
     </div>
   );
 };

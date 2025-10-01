@@ -5,9 +5,16 @@ const SwapModal = ({
   swapData, 
   setSwapData,
   onConfirmSwap, 
-  onCancelSwap 
+  onCancelSwap,
+  rugbyPlayers 
 }) => {
   if (!showSwapModal || !swapData) return null;
+
+  const getPlayerName = (playerId) => {
+    if (!rugbyPlayers) return `Player ${playerId}`;
+    const player = rugbyPlayers.find(p => p.id.toString() === playerId.toString());
+    return player ? player.name : `Player ${playerId}`;
+  };
 
   return (
     <div style={{
@@ -34,54 +41,107 @@ const SwapModal = ({
       }}>
         <h3 style={{ 
           marginTop: 0, 
-          marginBottom: '1rem',
-          color: 'var(--primary-orange)'
+          marginBottom: '1.5rem',
+          color: 'var(--primary-orange)',
+          textAlign: 'center'
         }}>
-          Swap Players
+          🔄 Swap Players
         </h3>
         
-        <div style={{ marginBottom: '1rem' }}>
-          <p><strong>Moving to starting position:</strong></p>
-          <div style={{
-            padding: '0.5rem',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '4px',
-            border: '1px solid #dee2e6'
+        <div style={{ marginBottom: '1.5rem' }}>
+          <p style={{ 
+            fontSize: '1rem',
+            marginBottom: '0.75rem',
+            color: 'var(--dark-gray)',
+            fontWeight: '600'
           }}>
-            {swapData.playerName} ({swapData.targetPosition})
+            Move to Starting:
+          </p>
+          <div style={{
+            padding: '1rem',
+            backgroundColor: '#E8F5E9',
+            borderRadius: '8px',
+            border: '2px solid #2ECC71',
+            fontWeight: 'bold',
+            fontSize: '1.1rem'
+          }}>
+            ⬆️ {swapData.newPlayerName || swapData.playerName} 
+            <span style={{ 
+              color: 'var(--dark-gray)', 
+              fontSize: '0.9rem',
+              fontWeight: 'normal',
+              marginLeft: '0.5rem'
+            }}>
+              ({swapData.targetPosition})
+            </span>
           </div>
         </div>
 
-        <div style={{ marginBottom: '1rem' }}>
-          <p><strong>Select a player to swap with:</strong></p>
-          <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <p style={{ 
+            fontSize: '1rem',
+            marginBottom: '0.75rem',
+            color: 'var(--dark-gray)',
+            fontWeight: '600'
+          }}>
+            Select which player to move to Bench:
+          </p>
+          <div style={{ 
+            maxHeight: '250px', 
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem'
+          }}>
             {swapData.currentPlayers && swapData.currentPlayers.length > 0 ? (
-              swapData.currentPlayers.map((currentPlayer) => (
-                <div
-                  key={currentPlayer.id}
-                  onClick={() => {
-                    setSwapData(prev => ({ ...prev, selectedCurrentPlayer: currentPlayer }));
-                  }}
-                  style={{
-                    padding: '0.5rem',
-                    margin: '0.25rem 0',
-                    backgroundColor: swapData.selectedCurrentPlayer?.id === currentPlayer.id 
-                      ? 'var(--primary-orange)' 
-                      : '#f8f9fa',
-                    color: swapData.selectedCurrentPlayer?.id === currentPlayer.id 
-                      ? 'white' 
-                      : 'black',
-                    borderRadius: '4px',
-                    border: '1px solid #dee2e6',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {currentPlayer.name} ({currentPlayer.fantasy_position})
-                </div>
-              ))
+              swapData.currentPlayers.map((currentPlayer) => {
+                const isSelected = swapData.selectedCurrentPlayer?.id === currentPlayer.id;
+                return (
+                  <div
+                    key={currentPlayer.id}
+                    onClick={() => {
+                      setSwapData(prev => ({ ...prev, selectedCurrentPlayer: currentPlayer }));
+                    }}
+                    style={{
+                      padding: '1rem',
+                      backgroundColor: isSelected ? '#FFEBEE' : 'white',
+                      borderRadius: '8px',
+                      border: isSelected ? '2px solid #C0392B' : '2px solid #e0e0e0',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      position: 'relative'
+                    }}
+                  >
+                    <div style={{
+                      fontWeight: 'bold',
+                      fontSize: '1.05rem',
+                      marginBottom: '0.25rem',
+                      color: isSelected ? '#C0392B' : 'var(--black)'
+                    }}>
+                      ⬇️ {getPlayerName(currentPlayer.player_id) || currentPlayer.name}
+                    </div>
+                    <div style={{ 
+                      fontSize: '0.9rem',
+                      color: 'var(--dark-gray)'
+                    }}>
+                      Currently: {currentPlayer.fantasy_position}
+                    </div>
+                    {isSelected && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        right: '1rem',
+                        transform: 'translateY(-50%)',
+                        fontSize: '1.5rem'
+                      }}>
+                        ✓
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             ) : (
-              <p style={{ color: '#666', fontStyle: 'italic' }}>
+              <p style={{ color: '#666', fontStyle: 'italic', textAlign: 'center', padding: '1rem' }}>
                 No players available to swap with.
               </p>
             )}
