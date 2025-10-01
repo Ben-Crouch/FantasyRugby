@@ -161,12 +161,27 @@ export const leaguesAPI = {
   getDraftStatus: async (leagueId) => {
     return apiRequest(`/leagues/${leagueId}/draft-status/`);
   },
+
+  submitWaiverClaim: async (leagueId, claimData) => {
+    return apiRequest(`/leagues/${leagueId}/waiver-claims/`, {
+      method: 'POST',
+      body: JSON.stringify(claimData),
+    });
+  },
+
+  getWaiverClaims: async (leagueId) => {
+    return apiRequest(`/leagues/${leagueId}/waiver-claims/`);
+  },
 };
 
 // Teams API
 export const teamsAPI = {
   getTeams: async () => {
     return apiRequest('/league-teams/');
+  },
+
+  getTeamsByLeague: async (leagueId) => {
+    return apiRequest(`/league-teams/?league_id=${leagueId}`);
   },
 
   createTeam: async (teamData) => {

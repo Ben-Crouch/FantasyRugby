@@ -777,3 +777,263 @@ def get_draft_status(request, league_id):
             
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def waiver_claims(request, league_id):
+    """
+    Handle waiver claims for a league
+    
+    GET /api/leagues/{league_id}/waiver-claims/ - Get all waiver claims
+    POST /api/leagues/{league_id}/waiver-claims/ - Submit a new waiver claim
+    
+    POST Request Body:
+        {
+            "team_id": "28",
+            "user_id": 4,
+            "player_to_add_id": "123",
+            "player_to_drop_id": "456"
+        }
+    """
+    client = DatabricksRestClient()
+    
+    if request.method == 'GET':
+        try:
+            sql = f"""
+            SELECT * FROM default.waiver_claims 
+            WHERE league_id = {league_id}
+            ORDER BY submitted_at DESC
+            """
+            
+            result = client.execute_sql(sql)
+            
+            if result and 'result' in result and result['result'].get('data_array'):
+                claims = []
+                for row in result['result']['data_array']:
+                    claims.append({
+                        'id': row[0],
+                        'league_id': row[1],
+                        'team_id': row[2],
+                        'user_id': row[3],
+                        'player_to_add_id': row[4],
+                        'player_to_drop_id': row[5],
+                        'claim_status': row[6],
+                        'priority': row[7],
+                        'submitted_at': row[8],
+                        'processed_at': row[9],
+                        'created_at': row[10],
+                        'updated_at': row[11]
+                    })
+                return Response(claims)
+            else:
+                return Response([])
+                
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    elif request.method == 'POST':
+        try:
+            data = request.data
+            
+            team_id = data.get('team_id')
+            user_id = data.get('user_id')
+            player_to_add_id = data.get('player_to_add_id')
+            player_to_drop_id = data.get('player_to_drop_id')
+            
+            if not all([team_id, user_id, player_to_add_id, player_to_drop_id]):
+                return Response(
+                    {'error': 'Missing required fields'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get team's waiver order
+            team_sql = f"SELECT waiver_order FROM default.league_teams WHERE id = '{team_id}' AND league_id = {league_id}"
+            team_result = client.execute_sql(team_sql)
+            
+            priority = 999  # Default priority
+            if team_result and 'result' in team_result and team_result['result'].get('data_array'):
+                waiver_order = team_result['result']['data_array'][0][0]
+                priority = waiver_order if waiver_order else 999
+            
+            # Insert waiver claim
+            insert_sql = f"""
+            INSERT INTO default.waiver_claims (
+                league_id, team_id, user_id, player_to_add_id, player_to_drop_id,
+                claim_status, priority, submitted_at, created_at, updated_at
+            ) VALUES (
+                {league_id}, '{team_id}', {user_id}, '{player_to_add_id}', '{player_to_drop_id}',
+                'PENDING', {priority}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            """
+            
+            result = client.execute_sql(insert_sql)
+            
+            if result and 'status' in result and result['status'].get('state') == 'SUCCEEDED':
+                return Response({
+                    'message': 'Waiver claim submitted successfully',
+                    'priority': priority
+                })
+            else:
+                return Response({'error': 'Failed to submit waiver claim'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            import traceback
+            return Response({
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def process_waivers(request, league_id):
+    """
+    Process all pending waiver claims for a league
+    
+    POST /api/leagues/{league_id}/process-waivers/
+    
+    Logic:
+    1. Get all pending claims ordered by waiver_order (priority)
+    2. Process claims in order
+    3. If player already claimed, reject subsequent claims for same player
+    4. Snake draft style: teams that made successful claims move to end of waiver order
+    5. Teams that didn't make claims stay at top of order
+    """
+    try:
+        client = DatabricksRestClient()
+        
+        # Get all teams in league with their waiver order
+        teams_sql = f"SELECT id, waiver_order FROM default.league_teams WHERE league_id = {league_id} ORDER BY waiver_order ASC"
+        teams_result = client.execute_sql(teams_sql)
+        
+        if not teams_result or 'result' not in teams_result:
+            return Response({'error': 'Could not load teams'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        teams_data = teams_result['result'].get('data_array', [])
+        
+        # Get all pending waiver claims ordered by priority
+        claims_sql = f"""
+        SELECT id, team_id, user_id, player_to_add_id, player_to_drop_id, priority
+        FROM default.waiver_claims 
+        WHERE league_id = {league_id} AND claim_status = 'PENDING'
+        ORDER BY priority ASC, submitted_at ASC
+        """
+        
+        claims_result = client.execute_sql(claims_sql)
+        
+        if not claims_result or 'result' not in claims_result:
+            return Response({'error': 'Could not load claims'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        claims = claims_result['result'].get('data_array', [])
+        
+        # Group claims by user/team, maintaining order within each user's claims
+        user_claims = {}
+        for claim in claims:
+            claim_id, team_id, user_id, player_to_add_id, player_to_drop_id, priority = claim
+            user_key = str(user_id)
+            if user_key not in user_claims:
+                user_claims[user_key] = []
+            user_claims[user_key].append({
+                'id': claim_id,
+                'team_id': team_id,
+                'user_id': user_id,
+                'player_to_add_id': player_to_add_id,
+                'player_to_drop_id': player_to_drop_id,
+                'priority': priority
+            })
+        
+        # Sort users by their best (lowest) priority
+        sorted_users = sorted(user_claims.items(), key=lambda x: min(c['priority'] for c in x[1]))
+        
+        claimed_players = set()  # Track which players have been claimed
+        successful_teams = []  # Teams that successfully claimed a player
+        teams_with_claims = set()  # All teams that made claims
+        
+        processed_count = 0
+        approved_count = 0
+        rejected_count = 0
+        
+        # Process claims round-by-round (like a snake draft)
+        # Round 1: User1-Choice1, User2-Choice1, User3-Choice1
+        # Round 2: User1-Choice2, User2-Choice2, User3-Choice2, etc.
+        max_claims = max(len(claims_list) for _, claims_list in sorted_users)
+        
+        for round_num in range(max_claims):
+            for user_id, claims_list in sorted_users:
+                if round_num < len(claims_list):
+                    claim = claims_list[round_num]
+                    claim_id = claim['id']
+                    team_id = claim['team_id']
+                    player_to_add_id = claim['player_to_add_id']
+                    
+                    teams_with_claims.add(team_id)
+                    
+                    # Check if player already claimed
+                    if player_to_add_id in claimed_players:
+                        # Reject claim - player already taken
+                        update_sql = f"""
+                        UPDATE default.waiver_claims 
+                        SET claim_status = 'REJECTED', processed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = {claim_id}
+                        """
+                        client.execute_sql(update_sql)
+                        rejected_count += 1
+                    else:
+                        # Approve claim - execute the transaction
+                        # 1. Add player to team
+                        # 2. Remove player from team
+                        # 3. Mark claim as approved
+                        
+                        # For now, just mark as approved (actual roster changes would need more logic)
+                        update_sql = f"""
+                        UPDATE default.waiver_claims 
+                        SET claim_status = 'APPROVED', processed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = {claim_id}
+                        """
+                        client.execute_sql(update_sql)
+                        
+                        claimed_players.add(player_to_add_id)
+                        successful_teams.append(team_id)
+                        approved_count += 1
+                    
+                    processed_count += 1
+        
+        # Update waiver order - Snake draft style
+        # Teams that made successful claims go to end of order (in reverse order of success)
+        # Teams that didn't make ANY claims stay at top (maintain their relative order)
+        # Teams that made claims but failed go to middle
+        
+        teams_no_claims = [t for t in teams_data if t[0] not in teams_with_claims]
+        teams_failed_claims = [t for t in teams_data if t[0] in teams_with_claims and t[0] not in successful_teams]
+        teams_successful = [t for t in teams_data if t[0] in successful_teams]
+        
+        new_order = []
+        new_order.extend(teams_no_claims)  # Keep non-participants at top
+        new_order.extend(teams_failed_claims)  # Failed claims in middle
+        new_order.extend(teams_successful)  # Successful claims go to end
+        
+        # Update waiver order for all teams
+        for idx, team in enumerate(new_order):
+            team_id = team[0]
+            update_order_sql = f"""
+            UPDATE default.league_teams 
+            SET waiver_order = {idx + 1}
+            WHERE id = '{team_id}'
+            """
+            client.execute_sql(update_order_sql)
+        
+        return Response({
+            'message': 'Waivers processed successfully',
+            'processed': processed_count,
+            'approved': approved_count,
+            'rejected': rejected_count,
+            'waiver_order_updated': True
+        })
+        
+    except Exception as e:
+        import traceback
+        return Response({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
