@@ -6,6 +6,8 @@ import NavigationBar from '../components/NavigationBar';
 import LeagueTable from '../components/LeagueTable';
 import MyTeam from '../components/MyTeam';
 import SwapModal from '../components/SwapModal';
+import Waivers from '../components/Waivers';
+import Trade from '../components/Trade';
 
 const LeagueDashboard = () => {
   const [leagueData, setLeagueData] = useState(null);
@@ -497,6 +499,26 @@ const LeagueDashboard = () => {
           onMovePlayerToStarting={movePlayerToStarting}
           onShowSwapModal={setShowSwapModal}
           setSwapData={setSwapData}
+        />
+      )}
+
+      {activeTab === 'waivers' && (
+        <Waivers
+          selectedTeam={selectedTeam}
+          rugbyPlayers={rugbyPlayers}
+          teamPlayers={localTeamPlayers.length > 0 ? localTeamPlayers : teamPlayers}
+          user={user}
+        />
+      )}
+
+      {activeTab === 'trade' && (
+        <Trade
+          selectedTeam={selectedTeam}
+          rugbyPlayers={rugbyPlayers}
+          teamPlayers={localTeamPlayers.length > 0 ? localTeamPlayers : teamPlayers}
+          user={user}
+          leagueId={leagueData?.id}
+          allTeams={teams}
         />
       )}
 

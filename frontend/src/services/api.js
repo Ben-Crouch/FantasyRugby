@@ -161,12 +161,45 @@ export const leaguesAPI = {
   getDraftStatus: async (leagueId) => {
     return apiRequest(`/leagues/${leagueId}/draft-status/`);
   },
+
+  submitWaiverClaim: async (leagueId, claimData) => {
+    return apiRequest(`/leagues/${leagueId}/waiver-claims/`, {
+      method: 'POST',
+      body: JSON.stringify(claimData),
+    });
+  },
+
+  getWaiverClaims: async (leagueId) => {
+    return apiRequest(`/leagues/${leagueId}/waiver-claims/`);
+  },
+
+  getTrades: async (leagueId) => {
+    return apiRequest(`/leagues/${leagueId}/trades/`);
+  },
+
+  proposeTrade: async (leagueId, tradeData) => {
+    return apiRequest(`/leagues/${leagueId}/trades/`, {
+      method: 'POST',
+      body: JSON.stringify(tradeData),
+    });
+  },
+
+  respondToTrade: async (tradeId, action) => {
+    return apiRequest(`/trades/${tradeId}/respond/`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    });
+  },
 };
 
 // Teams API
 export const teamsAPI = {
   getTeams: async () => {
     return apiRequest('/league-teams/');
+  },
+
+  getTeamsByLeague: async (leagueId) => {
+    return apiRequest(`/league-teams/?league_id=${leagueId}`);
   },
 
   createTeam: async (teamData) => {

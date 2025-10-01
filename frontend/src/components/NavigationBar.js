@@ -141,6 +141,32 @@ const NavigationBar = ({
         >
           My Team
         </button>
+        <button
+          onClick={() => setActiveTab('waivers')}
+          style={{
+            padding: '0.5rem 1rem',
+            border: 'none',
+            backgroundColor: activeTab === 'waivers' ? 'var(--primary-orange)' : 'transparent',
+            color: activeTab === 'waivers' ? 'white' : 'var(--primary-orange)',
+            cursor: 'pointer',
+            borderRadius: '4px'
+          }}
+        >
+          Waivers
+        </button>
+        <button
+          onClick={() => setActiveTab('trade')}
+          style={{
+            padding: '0.5rem 1rem',
+            border: 'none',
+            backgroundColor: activeTab === 'trade' ? 'var(--primary-orange)' : 'transparent',
+            color: activeTab === 'trade' ? 'white' : 'var(--primary-orange)',
+            cursor: 'pointer',
+            borderRadius: '4px'
+          }}
+        >
+          Trade
+        </button>
       </div>
     </div>
   );

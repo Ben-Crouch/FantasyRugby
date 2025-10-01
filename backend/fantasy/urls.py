@@ -1,5 +1,5 @@
 from django.urls import path
-from .rest_views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft, get_team_players, update_player_position, start_draft, get_draft_status
+from .rest_views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft, get_team_players, update_player_position, start_draft, get_draft_status, waiver_claims, process_waivers, trade_proposals, respond_to_trade
 from .admin_views import remove_team_from_league, get_league_admin, is_user_league_admin
 from .authentication import register, login, refresh_token, verify_token, logout
 
@@ -13,6 +13,10 @@ urlpatterns = [
     path('leagues/<int:league_id>/complete-draft/', complete_draft, name='complete_draft'),
     path('leagues/<int:league_id>/start-draft/', start_draft, name='start_draft'),
     path('leagues/<int:league_id>/draft-status/', get_draft_status, name='get_draft_status'),
+    path('leagues/<int:league_id>/waiver-claims/', waiver_claims, name='waiver_claims'),
+    path('leagues/<int:league_id>/process-waivers/', process_waivers, name='process_waivers'),
+    path('leagues/<int:league_id>/trades/', trade_proposals, name='trade_proposals'),
+    path('trades/<str:trade_id>/respond/', respond_to_trade, name='respond_to_trade'),
     path('league-teams/<int:team_id>/players/', get_team_players, name='get_team_players'),
     path('league-teams/<int:team_id>/players/<int:player_id>/', update_player_position, name='update_player_position'),
     # League admin endpoints
