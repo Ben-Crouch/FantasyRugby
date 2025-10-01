@@ -69,51 +69,159 @@ const LeagueTable = ({
           )}
         </div>
       ) : (
-        <div className="table-responsive">
-          <table className="table">
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}>
             <thead>
-              <tr>
-                <th>Team Name</th>
-                <th>Owner</th>
-                <th>Players</th>
-                <th>Status</th>
-                {isAdmin && <th>Actions</th>}
+              <tr style={{ backgroundColor: 'var(--primary-orange)', color: 'white' }}>
+                <th style={{ 
+                  padding: '1rem', 
+                  textAlign: 'left', 
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  #
+                </th>
+                <th style={{ 
+                  padding: '1rem', 
+                  textAlign: 'left', 
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  Team Name
+                </th>
+                <th style={{ 
+                  padding: '1rem', 
+                  textAlign: 'center', 
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  W
+                </th>
+                <th style={{ 
+                  padding: '1rem', 
+                  textAlign: 'center', 
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  L
+                </th>
+                <th style={{ 
+                  padding: '1rem', 
+                  textAlign: 'center', 
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  D
+                </th>
+                <th style={{ 
+                  padding: '1rem', 
+                  textAlign: 'center', 
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  PF
+                </th>
+                <th style={{ 
+                  padding: '1rem', 
+                  textAlign: 'center', 
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  PA
+                </th>
+                <th style={{ 
+                  padding: '1rem', 
+                  textAlign: 'center', 
+                  fontWeight: 'bold',
+                  fontSize: '1rem'
+                }}>
+                  Pts
+                </th>
               </tr>
             </thead>
             <tbody>
-              {teams.map((team) => (
-                <tr key={team.id}>
-                  <td>
-                    <strong>{team.team_name}</strong>
+              {teams.map((team, index) => (
+                <tr 
+                  key={team.id || index}
+                  style={{ 
+                    borderBottom: '1px solid #e0e0e0',
+                    backgroundColor: 'white',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  <td style={{ 
+                    padding: '1rem', 
+                    fontWeight: 'bold',
+                    color: 'var(--primary-orange)',
+                    fontSize: '1.1rem'
+                  }}>
+                    {index + 1}
                   </td>
-                  <td>
-                    {team.team_owner_name || `User ${team.team_owner}`}
+                  <td style={{ 
+                    padding: '1rem',
+                    fontWeight: 'bold',
+                    color: 'var(--black)',
+                    fontSize: '1rem'
+                  }}>
+                    {team.team_name}
                   </td>
-                  <td>
-                    <span className="badge badge-info">
-                      {team.player_count || 0} players
-                    </span>
+                  <td style={{ 
+                    padding: '1rem',
+                    color: 'var(--dark-gray)',
+                    textAlign: 'center',
+                    fontWeight: 'bold'
+                  }}>
+                    {team.wins || 0}
                   </td>
-                  <td>
-                    <span className={`badge ${team.is_active ? 'badge-success' : 'badge-warning'}`}>
-                      {team.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                  <td style={{ 
+                    padding: '1rem',
+                    color: 'var(--dark-gray)',
+                    textAlign: 'center',
+                    fontWeight: 'bold'
+                  }}>
+                    {team.losses || 0}
                   </td>
-                  {isAdmin && (
-                    <td>
-                      <button 
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => {
-                          if (window.confirm(`Are you sure you want to remove ${team.team_name} from this league?`)) {
-                            // Handle team removal
-                            console.log('Remove team:', team.id);
-                          }
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  )}
+                  <td style={{ 
+                    padding: '1rem',
+                    color: 'var(--dark-gray)',
+                    textAlign: 'center',
+                    fontWeight: 'bold'
+                  }}>
+                    {team.draws || 0}
+                  </td>
+                  <td style={{ 
+                    padding: '1rem',
+                    color: 'var(--dark-gray)',
+                    textAlign: 'center',
+                    fontWeight: 'bold'
+                  }}>
+                    {team.points_for || 0}
+                  </td>
+                  <td style={{ 
+                    padding: '1rem',
+                    color: 'var(--dark-gray)',
+                    textAlign: 'center',
+                    fontWeight: 'bold'
+                  }}>
+                    {team.points_against || 0}
+                  </td>
+                  <td style={{ 
+                    padding: '1rem',
+                    color: 'var(--primary-orange)',
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem'
+                  }}>
+                    {team.league_points || 0}
+                  </td>
                 </tr>
               ))}
             </tbody>

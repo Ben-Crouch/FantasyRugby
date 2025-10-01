@@ -150,6 +150,17 @@ export const leaguesAPI = {
       body: JSON.stringify({ team_rosters: teamRosters }),
     });
   },
+
+  startDraft: async (leagueId, userId) => {
+    return apiRequest(`/leagues/${leagueId}/start-draft/`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    });
+  },
+
+  getDraftStatus: async (leagueId) => {
+    return apiRequest(`/leagues/${leagueId}/draft-status/`);
+  },
 };
 
 // Teams API

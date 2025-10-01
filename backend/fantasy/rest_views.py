@@ -78,7 +78,8 @@ def user_leagues(request):
                         'max_teams': row[4],  # max_teams is at index 4
                         'max_players_per_team': row[5],  # max_players_per_team is at index 5
                         'is_public': row[6],  # is_public is at index 6
-                        'created_at': row[7]  # created_at is at index 7
+                        'created_at': row[7],  # created_at is at index 7
+                        'draft_status': row[8] if len(row) > 8 else 'NOT_STARTED'  # draft_status is at index 8
                     })
                 return Response(leagues)
             else:
@@ -105,8 +106,8 @@ def user_leagues(request):
             is_public_sql = 'true' if is_public else 'false'
             
             sql = f"""
-            INSERT INTO default.user_created_leagues (name, description, created_by_user_id, max_teams, max_players_per_team, is_public)
-            VALUES ('{name}', '{description}', {user_id}, {max_teams}, {max_players_per_team}, {is_public_sql})
+            INSERT INTO default.user_created_leagues (name, description, created_by_user_id, max_teams, max_players_per_team, is_public, draft_status)
+            VALUES ('{name}', '{description}', {user_id}, {max_teams}, {max_players_per_team}, {is_public_sql}, 'NOT_STARTED')
             """
             result = client.execute_sql(sql)
             
@@ -445,7 +446,14 @@ def complete_draft(request, league_id):
         data = request.data
         
         # Debug logging
+        print(f"DEBUG: Complete draft request data type: {type(data)}")
         print(f"DEBUG: Complete draft request data: {data}")
+        
+        # Handle if data is a string (shouldn't happen but let's be safe)
+        if isinstance(data, str):
+            import json
+            data = json.loads(data)
+            print(f"DEBUG: Parsed string to dict: {data}")
         
         team_rosters = data.get('team_rosters', [])
         print(f"DEBUG: Team rosters: {team_rosters}")
@@ -494,6 +502,10 @@ def complete_draft(request, league_id):
                         # Continue with other players even if one fails
             
             teams_updated += 1
+        
+        # Update draft status to COMPLETED
+        status_sql = f"UPDATE default.user_created_leagues SET draft_status = 'COMPLETED' WHERE id = {league_id}"
+        client.execute_sql(status_sql)
         
         return Response({
             'status': 'Draft completed successfully',
@@ -680,5 +692,88 @@ def update_player_position(request, team_id, player_id):
             'is_starting': is_starting
         })
         
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def start_draft(request, league_id):
+    """
+    Start a draft by updating league status to LIVE
+    
+    POST /api/leagues/{league_id}/start-draft/
+    
+    Only league admin can start the draft.
+    """
+    try:
+        client = DatabricksRestClient()
+        
+        print(f"DEBUG: start_draft called for league_id={league_id}")
+        print(f"DEBUG: Request data: {request.data}")
+        
+        # Verify user is admin
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'User ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if user is admin
+        league_sql = f"SELECT created_by_user_id FROM default.user_created_leagues WHERE id = {league_id}"
+        league_result = client.execute_sql(league_sql)
+        
+        print(f"DEBUG: League query result: {league_result}")
+        
+        if not league_result or 'result' not in league_result or not league_result['result'].get('data_array'):
+            return Response({'error': 'League not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        created_by = str(league_result['result']['data_array'][0][0])
+        print(f"DEBUG: League created_by={created_by}, user_id={user_id}")
+        
+        if created_by != str(user_id):
+            return Response({'error': 'Only league admin can start the draft'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Update draft status to LIVE
+        update_sql = f"UPDATE default.user_created_leagues SET draft_status = 'LIVE' WHERE id = {league_id}"
+        print(f"DEBUG: Executing: {update_sql}")
+        result = client.execute_sql(update_sql)
+        
+        print(f"DEBUG: Update result: {result}")
+        
+        if result and 'status' in result and result['status'].get('state') == 'SUCCEEDED':
+            return Response({'status': 'Draft started successfully', 'draft_status': 'LIVE'})
+        else:
+            error_msg = result.get('status', {}).get('error', {}).get('message', 'Unknown error') if result else 'No result'
+            print(f"DEBUG: Failed to update - {error_msg}")
+            return Response({'error': f'Failed to start draft: {error_msg}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except Exception as e:
+        print(f"DEBUG: Exception in start_draft: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_draft_status(request, league_id):
+    """
+    Get the current draft status for a league
+    
+    GET /api/leagues/{league_id}/draft-status/
+    
+    Returns: NOT_STARTED, LIVE, or COMPLETED
+    """
+    try:
+        client = DatabricksRestClient()
+        
+        sql = f"SELECT draft_status FROM default.user_created_leagues WHERE id = {league_id}"
+        result = client.execute_sql(sql)
+        
+        if result and 'result' in result and result['result'].get('data_array'):
+            draft_status = result['result']['data_array'][0][0] or 'NOT_STARTED'
+            return Response({'draft_status': draft_status})
+        else:
+            return Response({'error': 'League not found'}, status=status.HTTP_404_NOT_FOUND)
+            
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

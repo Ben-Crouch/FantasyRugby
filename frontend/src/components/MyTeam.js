@@ -17,6 +17,11 @@ const MyTeam = ({
     return player ? player.name : `Player ${playerId}`;
   };
 
+  const getPlayerTeam = (playerId) => {
+    const player = rugbyPlayers.find(p => p.id.toString() === playerId.toString());
+    return player ? player.team : '';
+  };
+
   const positionMapping = {
     'Prop': 'Prop',
     'Hooker': 'Hooker', 
@@ -28,6 +33,21 @@ const MyTeam = ({
     'Centre': 'Centre',
     'Wing': 'Back Three',
     'Fullback': 'Back Three'
+  };
+
+  // Position color mapping (same as draft)
+  const getPositionColor = (position) => {
+    const colors = {
+      'Prop': '#E74C3C',           // Red
+      'Hooker': '#C0392B',         // Dark Red
+      'Lock': '#3498DB',           // Blue
+      'Back Row': '#2ECC71',       // Green
+      'Scrum-half': '#F39C12',     // Orange
+      'Fly-half': '#E67E22',       // Dark Orange
+      'Centre': '#1ABC9C',         // Teal
+      'Back Three': '#9B59B6'      // Purple
+    };
+    return colors[position] || '#95A5A6';
   };
 
   const playersToUse = Array.isArray(localTeamPlayers) && localTeamPlayers.length > 0 
@@ -97,6 +117,20 @@ const MyTeam = ({
   const startingPositions = ['Prop', 'Hooker', 'Lock', 'Back Row', 'Scrum-half', 'Fly-half', 'Centre', 'Back Three'];
   const benchPlayers = positionGroups['Bench'] || [];
 
+  // Get starting players sorted by position order
+  const startingPlayers = playersToUse.filter(player => 
+    player.is_starting === 'true' || player.is_starting === true
+  );
+  
+  // Sort starting players by position order
+  const sortedStartingPlayers = [...startingPlayers].sort((a, b) => {
+    const posA = a.fantasy_position || positionMapping[a.position] || a.position;
+    const posB = b.fantasy_position || positionMapping[b.position] || b.position;
+    const indexA = startingPositions.indexOf(posA);
+    const indexB = startingPositions.indexOf(posB);
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+
   return (
     <div className="card" style={{ marginBottom: '2rem' }}>
       <div className="card-header">
@@ -120,46 +154,79 @@ const MyTeam = ({
             flexDirection: 'column', 
             gap: '0.5rem' 
           }}>
-            {playersToUse.filter(player => 
-              player.is_starting === 'true' || player.is_starting === true
-            ).map(player => (
-              <div
-                key={player.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '1rem',
-                  border: '2px solid #666666',
-                  borderRadius: '8px',
-                  backgroundColor: '#f8f9fa'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '1.1rem', minWidth: '150px' }}>
-                    {getPlayerName(player.player_id)}
-                  </div>
-                  <div style={{ fontSize: '0.9rem', color: '#666', minWidth: '100px' }}>
-                    {player.fantasy_position || positionMapping[player.position] || player.position}
-                  </div>
-                </div>
-                <button
-                  onClick={() => onMovePlayerToBench(player)}
+            {sortedStartingPlayers.map(player => {
+              const fantasyPos = player.fantasy_position || positionMapping[player.position] || player.position;
+              return (
+                <div
+                  key={player.id}
                   style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.9rem',
-                    backgroundColor: '#8B0000',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '0.75rem 1.5rem',
+                    border: '2px solid var(--light-gray)',
+                    borderRadius: '25px',
+                    backgroundColor: 'white',
+                    borderLeft: '4px solid var(--primary-orange)',
+                    transition: 'all 0.2s',
+                    minHeight: '60px'
                   }}
                 >
-                  Bench
-                </button>
-              </div>
-            ))}
+                  {/* Position Pill */}
+                  <div style={{ 
+                    minWidth: '120px',
+                    marginRight: '1rem'
+                  }}>
+                    <div style={{
+                      display: 'inline-block',
+                      padding: '0.4rem 0.9rem',
+                      borderRadius: '15px',
+                      backgroundColor: getPositionColor(fantasyPos),
+                      color: 'white',
+                      fontSize: '0.85rem',
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {fantasyPos}
+                    </div>
+                  </div>
+                  
+                  {/* Player Info */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ 
+                      fontSize: '1.1rem',
+                      fontWeight: 'bold',
+                      color: 'var(--black)',
+                      marginBottom: '0.25rem'
+                    }}>
+                      {getPlayerName(player.player_id)}
+                    </div>
+                    <div style={{ 
+                      fontSize: '0.9rem',
+                      color: 'var(--dark-gray)'
+                    }}>
+                      {getPlayerTeam(player.player_id)}
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => onMovePlayerToBench(player)}
+                    style={{
+                      padding: '0.4rem 0.9rem',
+                      fontSize: '0.85rem',
+                      backgroundColor: '#C0392B',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '15px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Bench
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -184,44 +251,79 @@ const MyTeam = ({
             }}>
               {playersToUse.filter(player => 
                 player.is_starting === 'false' || player.is_starting === false
-              ).map(player => (
-                <div
-                  key={player.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '1rem',
-                    border: '2px solid #666666',
-                    borderRadius: '8px',
-                    backgroundColor: '#f8f9fa'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '1.1rem', minWidth: '150px' }}>
-                      {getPlayerName(player.player_id)}
-                    </div>
-                    <div style={{ fontSize: '0.9rem', color: '#666', minWidth: '100px' }}>
-                      {player.fantasy_position || positionMapping[player.position] || player.position}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => onMovePlayerToStarting(player, positionMapping[player.position] || player.position)}
+              ).map(player => {
+                const fantasyPos = player.fantasy_position || positionMapping[player.position] || player.position;
+                return (
+                  <div
+                    key={player.id}
                     style={{
-                      padding: '0.5rem 1rem',
-                      fontSize: '0.9rem',
-                      backgroundColor: '#006400',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold'
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '0.75rem 1.5rem',
+                      border: '2px solid var(--light-gray)',
+                      borderRadius: '25px',
+                      backgroundColor: 'white',
+                      borderLeft: '4px solid var(--dark-gray)',
+                      transition: 'all 0.2s',
+                      minHeight: '60px'
                     }}
                   >
-                    Start
-                  </button>
-                </div>
-              ))}
+                    {/* Position Pill */}
+                    <div style={{ 
+                      minWidth: '120px',
+                      marginRight: '1rem'
+                    }}>
+                      <div style={{
+                        display: 'inline-block',
+                        padding: '0.4rem 0.9rem',
+                        borderRadius: '15px',
+                        backgroundColor: '#95A5A6',
+                        color: 'white',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        Bench
+                      </div>
+                    </div>
+                    
+                    {/* Player Info */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ 
+                        fontSize: '1.1rem',
+                        fontWeight: 'bold',
+                        color: 'var(--black)',
+                        marginBottom: '0.25rem'
+                      }}>
+                        {getPlayerName(player.player_id)}
+                      </div>
+                      <div style={{ 
+                        fontSize: '0.9rem',
+                        color: 'var(--dark-gray)'
+                      }}>
+                        {getPlayerTeam(player.player_id)} • {fantasyPos}
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => onMovePlayerToStarting(player, positionMapping[player.position] || player.position)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.85rem',
+                        backgroundColor: '#2ECC71',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '15px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      Start
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

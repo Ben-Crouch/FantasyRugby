@@ -5,6 +5,7 @@ const NavigationBar = ({
   leagueData, 
   isAdmin, 
   draftComplete, 
+  draftStatus,
   activeTab, 
   setActiveTab, 
   onStartDraft 
@@ -66,21 +67,44 @@ const NavigationBar = ({
           >
             ← Back to My Leagues
           </button>
-          {isAdmin && !draftComplete && (
-            <button 
-              onClick={onStartDraft}
-              className="btn btn-primary"
-              style={{ 
-                backgroundColor: 'var(--primary-orange)', 
-                border: 'none',
-                padding: '0.5rem 1rem',
-                borderRadius: '4px',
-                color: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              Start Draft
-            </button>
+          {draftStatus !== 'COMPLETED' && (
+            <>
+              {draftStatus === 'NOT_STARTED' && isAdmin && (
+                <button 
+                  onClick={onStartDraft}
+                  className="btn btn-primary"
+                  style={{ 
+                    backgroundColor: 'var(--primary-orange)', 
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🚀 Start Draft
+                </button>
+              )}
+              {draftStatus === 'LIVE' && (
+                <button 
+                  onClick={onStartDraft}
+                  className="btn btn-primary"
+                  style={{ 
+                    backgroundColor: 'var(--primary-orange)', 
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    animation: !isAdmin ? 'pulse 2s infinite' : 'none'
+                  }}
+                >
+                  {isAdmin ? '🎮 Go to Draft' : '🏉 Join Draft'}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
