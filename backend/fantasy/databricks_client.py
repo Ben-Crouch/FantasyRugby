@@ -165,6 +165,7 @@ class DatabricksClient:
             'max_teams': 'INT',
             'max_players_per_team': 'INT',
             'is_public': 'BOOLEAN',
+            'tournament_id': 'BIGINT',
             'created_at': 'TIMESTAMP'
         }
         tables_created &= self.create_table('user_created_leagues', schema)
@@ -198,6 +199,18 @@ class DatabricksClient:
             'created_at': 'TIMESTAMP'
         }
         tables_created &= self.create_table('fantasy_teams', schema)
+        
+        # Create tournaments table
+        schema = {
+            'id': 'BIGINT GENERATED ALWAYS AS IDENTITY',
+            'name': 'STRING',
+            'description': 'STRING',
+            'start_date': 'DATE',
+            'end_date': 'DATE',
+            'is_active': 'BOOLEAN',
+            'created_at': 'TIMESTAMP'
+        }
+        tables_created &= self.create_table('tournaments', schema)
         
         return tables_created
 
