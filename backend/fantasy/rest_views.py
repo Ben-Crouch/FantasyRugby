@@ -114,8 +114,9 @@ def user_leagues(request):
                         'max_teams': row[4],  # max_teams is at index 4
                         'max_players_per_team': row[5],  # max_players_per_team is at index 5
                         'is_public': row[6],  # is_public is at index 6
-                        'created_at': row[7],  # created_at is at index 7
-                        'draft_status': row[8] if len(row) > 8 else 'NOT_STARTED'  # draft_status is at index 8
+                        'tournament_id': row[7],  # tournament_id is at index 7
+                        'created_at': row[8],  # created_at is at index 8
+                        'draft_status': row[9] if len(row) > 9 else 'NOT_STARTED'  # draft_status is at index 9
                     })
                 return Response(leagues)
             else:
@@ -132,18 +133,22 @@ def user_leagues(request):
             max_teams = data.get('max_teams', 6)
             max_players_per_team = 15  # Fixed at 15
             is_public = data.get('is_public', True)
+            tournament_id = data.get('tournament_id')
             
             # Get user ID from request (assuming it's passed in the request)
             user_id = data.get('user_id')
             if not user_id:
                 return Response({'error': 'User ID is required to create a league'}, status=status.HTTP_400_BAD_REQUEST)
             
+            if not tournament_id:
+                return Response({'error': 'Tournament ID is required to create a league'}, status=status.HTTP_400_BAD_REQUEST)
+            
             # Convert boolean to proper SQL format
             is_public_sql = 'true' if is_public else 'false'
             
             sql = f"""
-            INSERT INTO default.user_created_leagues (name, description, created_by_user_id, max_teams, max_players_per_team, is_public, draft_status)
-            VALUES ('{name}', '{description}', {user_id}, {max_teams}, {max_players_per_team}, {is_public_sql}, 'NOT_STARTED')
+            INSERT INTO default.user_created_leagues (name, description, created_by_user_id, max_teams, max_players_per_team, is_public, created_at, draft_status, tournament_id)
+            VALUES ('{name}', '{description}', {user_id}, {max_teams}, {max_players_per_team}, {is_public_sql}, CURRENT_TIMESTAMP, 'NOT_STARTED', {tournament_id})
             """
             result = client.execute_sql(sql)
             
@@ -165,7 +170,8 @@ def user_leagues(request):
                     'max_teams': row[4],    # max_teams is at index 4
                     'max_players_per_team': row[5],  # max_players_per_team is at index 5
                     'is_public': row[6],    # is_public is at index 6
-                    'created_at': row[7]   # created_at is at index 7
+                    'tournament_id': row[7],  # tournament_id is at index 7
+                    'created_at': row[8]   # created_at is at index 8
                 }
                 return Response(league, status=status.HTTP_201_CREATED)
             else:
@@ -583,13 +589,22 @@ def complete_draft(request, league_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def rugby_players(request):
-    """Get all rugby players"""
+    """Get rugby players, optionally filtered by tournament"""
     try:
         client = DatabricksRestClient()
         
-        # Get all rugby players
+        # Get tournament_id from query parameters
+        tournament_id = request.GET.get('tournament_id')
+        
+        # Build SQL query
+        if tournament_id:
+            sql = f"SELECT * FROM default.rugby_players_25_26 WHERE tournament_id = {tournament_id}"
+        else:
+            sql = "SELECT * FROM default.rugby_players_25_26"
+        
+        # Get rugby players
         try:
-            result = client.execute_sql("SELECT * FROM default.rugby_players_25_26")
+            result = client.execute_sql(sql)
             if result and 'result' in result and result['result'].get('data_array'):
                 players = []
                 for row in result['result']['data_array']:
@@ -598,7 +613,8 @@ def rugby_players(request):
                         'team': row[1],
                         'name': row[2],
                         'position': row[3],
-                        'fantasy_position': row[4]
+                        'fantasy_position': row[4],
+                        'tournament_id': row[5] if len(row) > 5 else None
                     })
                 return Response(players)
             else:
@@ -1352,6 +1368,56 @@ def respond_to_trade(request, trade_id):
             
             return Response({'message': 'Trade rejected successfully'})
         
+    except Exception as e:
+        import traceback
+        return Response({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def tournaments(request):
+    """
+    Get all active tournaments
+    
+    Returns:
+        List of tournaments with their details
+    """
+    try:
+        client = DatabricksRestClient()
+        
+        # Check cache first
+        cache_key = 'tournaments'
+        cached_result = get_cached_result(cache_key)
+        if cached_result:
+            return Response(cached_result)
+        
+        # Query tournaments table
+        sql = "SELECT Tournamen_ID, Tournament FROM default.tournaments ORDER BY Tournament"
+        result = client.execute_sql(sql)
+        
+        if result and 'result' in result and 'data_array' in result['result']:
+            tournaments_data = []
+            for row in result['result']['data_array']:
+                tournaments_data.append({
+                    'id': row[0],
+                    'name': row[1],
+                    'description': f'Fantasy league for {row[1]}',
+                    'start_date': '2025-01-01',
+                    'end_date': '2025-12-31',
+                    'is_active': True,
+                    'created_at': '2025-01-01T00:00:00Z'
+                })
+            
+            # Cache the result
+            set_cached_result(cache_key, tournaments_data)
+            
+            return Response(tournaments_data)
+        else:
+            return Response([])
+            
     except Exception as e:
         import traceback
         return Response({

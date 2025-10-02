@@ -181,206 +181,319 @@ const LeagueSelection = () => {
 
   if (error) {
     return (
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <div className="card">
-          <div className="alert alert-error">
-            {error}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+        {/* Page Header */}
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            gap: '12px',
+            marginBottom: '8px'
+          }}>
+            <img 
+              src="/rugby-ball.png" 
+              alt="Rugby Ball" 
+              style={{ 
+                width: '40px', 
+                height: '40px',
+                objectFit: 'contain'
+              }}
+            />
+            <h1 style={{ 
+              fontSize: '32px', 
+              fontWeight: '700', 
+              color: 'var(--databricks-blue)',
+              margin: '0'
+            }}>
+              Fantasy Rugby
+            </h1>
           </div>
-          <button 
-            onClick={fetchLeagues}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: 'var(--primary)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              marginTop: '1rem'
-            }}
-          >
-            Try Again
-          </button>
+          <p style={{ 
+            fontSize: '18px', 
+            color: 'var(--neutral-600)', 
+            margin: '0 0 24px 0',
+            textAlign: 'center'
+          }}>
+            Join an existing league or create your own
+          </p>
+        </div>
+
+        <div className="card" style={{ textAlign: 'center' }}>
+          <div style={{ padding: '48px 24px' }}>
+            <div style={{ fontSize: '64px', marginBottom: '16px' }}>⚠️</div>
+            <h3 style={{ 
+              color: 'var(--databricks-red)', 
+              margin: '0 0 16px 0',
+              fontSize: '20px'
+            }}>
+              Error Loading Leagues
+            </h3>
+            <p style={{ 
+              color: 'var(--neutral-600)', 
+              margin: '0 0 24px 0',
+              fontSize: '16px'
+            }}>
+              {error}
+            </p>
+            <button 
+              onClick={fetchLeagues}
+              className="btn btn-primary"
+              style={{ fontSize: '14px' }}
+            >
+              🔄 Try Again
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div className="card">
-        <div className="card-header">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 className="card-title">Choose Your League</h2>
-              <p style={{ color: 'var(--dark-gray)', margin: 0 }}>
-                Join an existing league or create your own
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={fetchLeagues}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  backgroundColor: 'var(--gray)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: 'bold'
-                }}
-              >
-                Refresh
-              </button>
-              <button
-                onClick={() => navigate('/my-leagues')}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  backgroundColor: 'var(--black)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: 'bold'
-                }}
-              >
-                My Leagues
-              </button>
-            </div>
-          </div>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+      {/* Page Header */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          gap: '12px',
+          marginBottom: '8px'
+        }}>
+          <img 
+            src="/rugby-ball.png" 
+            alt="Rugby Ball" 
+            style={{ 
+              width: '40px', 
+              height: '40px',
+              objectFit: 'contain'
+            }}
+          />
+          <h1 style={{ 
+            fontSize: '32px', 
+            fontWeight: '700', 
+            color: 'var(--databricks-blue)',
+            margin: '0'
+          }}>
+            Fantasy Rugby
+          </h1>
         </div>
+        <p style={{ 
+          fontSize: '18px', 
+          color: 'var(--neutral-600)', 
+          margin: '0 0 24px 0',
+          textAlign: 'center'
+        }}>
+          Join an existing league or create your own
+        </p>
+        
+        {/* Action Buttons */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          gap: '12px',
+          marginBottom: '32px'
+        }}>
+          <button
+            onClick={fetchLeagues}
+            className="btn btn-outline"
+            style={{ fontSize: '14px' }}
+          >
+            🔄 Refresh
+          </button>
+          <button
+            onClick={() => navigate('/my-leagues')}
+            className="btn btn-primary"
+            style={{ fontSize: '14px' }}
+          >
+            📋 My Leagues
+          </button>
+        </div>
+      </div>
 
-        {/* Create League Section */}
-        <div style={{ marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3>Create New League</h3>
+      {/* Main Content Grid */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
+        gap: '24px',
+        alignItems: 'start'
+      }}>
+        {/* Create League Card */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title" style={{ 
+              fontSize: '20px', 
+              fontWeight: '600',
+              color: 'var(--databricks-blue)',
+              margin: '0 0 8px 0'
+            }}>
+              Create New League
+            </h3>
+            <p style={{ 
+              color: 'var(--neutral-600)', 
+              margin: '0 0 16px 0',
+              fontSize: '14px'
+            }}>
+              Start your own fantasy rugby league
+            </p>
+            
             <button
               onClick={() => setShowCreateForm(!showCreateForm)}
               className="btn btn-primary"
+              style={{ fontSize: '14px' }}
             >
-              {showCreateForm ? 'Cancel' : 'Create League'}
+              {showCreateForm ? '✖️ Cancel' : '➕ Create League'}
             </button>
           </div>
 
           {showCreateForm && (
-            <form onSubmit={handleCreateLeague} style={{ marginBottom: '1rem' }}>
-              {createErrors.general && (
-                <div className="alert alert-error">
-                  {createErrors.general}
+            <div style={{ padding: '24px' }}>
+              <form onSubmit={handleCreateLeague}>
+                {createErrors.general && (
+                  <div className="alert alert-error" style={{ marginBottom: '16px' }}>
+                    {createErrors.general}
+                  </div>
+                )}
+
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label className="form-label">League Name</label>
+                  <input
+                    type="text"
+                    value={createFormData.name}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className={`form-input ${createErrors.name ? 'error' : ''}`}
+                    placeholder="Enter league name"
+                  />
+                  {createErrors.name && (
+                    <div className="form-error">{createErrors.name}</div>
+                  )}
                 </div>
-              )}
 
-              <div className="form-group">
-                <label className="form-label">League Name</label>
-                <input
-                  type="text"
-                  value={createFormData.name}
-                  onChange={(e) => setCreateFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className={`form-input ${createErrors.name ? 'error' : ''}`}
-                  placeholder="Enter league name"
-                />
-                {createErrors.name && (
-                  <div className="form-error">{createErrors.name}</div>
-                )}
-              </div>
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label className="form-label">Description</label>
+                  <textarea
+                    value={createFormData.description}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, description: e.target.value }))}
+                    className="form-input"
+                    placeholder="Describe your league (optional)"
+                    rows="3"
+                  />
+                </div>
 
-              <div className="form-group">
-                <label className="form-label">Description</label>
-                <textarea
-                  value={createFormData.description}
-                  onChange={(e) => setCreateFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="form-input"
-                  placeholder="Describe your league (optional)"
-                  rows="3"
-                />
-              </div>
+                <div className="form-group" style={{ marginBottom: '24px' }}>
+                  <label className="form-label">Max Teams</label>
+                  <input
+                    type="number"
+                    value={createFormData.max_teams}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, max_teams: parseInt(e.target.value) }))}
+                    className={`form-input ${createErrors.max_teams ? 'error' : ''}`}
+                    min="2"
+                    max="12"
+                  />
+                  {createErrors.max_teams && (
+                    <div className="form-error">{createErrors.max_teams}</div>
+                  )}
+                </div>
 
-              <div className="form-group">
-                <label className="form-label">Max Teams</label>
-                <input
-                  type="number"
-                  value={createFormData.max_teams}
-                  onChange={(e) => setCreateFormData(prev => ({ ...prev, max_teams: parseInt(e.target.value) }))}
-                  className={`form-input ${createErrors.max_teams ? 'error' : ''}`}
-                  min="2"
-                  max="12"
-                />
-                {createErrors.max_teams && (
-                  <div className="form-error">{createErrors.max_teams}</div>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={isCreating}
-              >
-                {isCreating ? 'Creating...' : 'Create League'}
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isCreating}
+                  style={{ width: '100%', fontSize: '14px' }}
+                >
+                  {isCreating ? '⏳ Creating...' : '🚀 Create League'}
+                </button>
+              </form>
+            </div>
           )}
         </div>
 
-        {/* Join League Section */}
-        <div>
-          <h3 style={{ marginBottom: '1rem' }}>Join Existing League</h3>
+        {/* Join League Card */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title" style={{ 
+              fontSize: '20px', 
+              fontWeight: '600',
+              color: 'var(--databricks-blue)',
+              margin: '0 0 8px 0'
+            }}>
+              Join Existing League
+            </h3>
+            <p style={{ 
+              color: 'var(--neutral-600)', 
+              margin: '0 0 16px 0',
+              fontSize: '14px'
+            }}>
+              {leagues.length === 0 ? 'No leagues available' : `${leagues.length} league${leagues.length !== 1 ? 's' : ''} available`}
+            </p>
+          </div>
           
-          {leagues.length === 0 ? (
-            <div className="alert alert-info">
-              No leagues available. Create a new league to get started!
-            </div>
-          ) : (
-            <form onSubmit={handleJoinLeague}>
-              {joinErrors.general && (
-                <div className="alert alert-error">
-                  {joinErrors.general}
+          <div style={{ padding: '24px' }}>
+            {leagues.length === 0 ? (
+              <div className="alert alert-info" style={{ 
+                textAlign: 'center',
+                padding: '24px',
+                backgroundColor: 'var(--databricks-light-blue)',
+                border: '1px solid var(--databricks-blue)',
+                borderRadius: '8px'
+              }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏉</div>
+                <p style={{ margin: '0', fontSize: '16px', color: 'var(--databricks-blue)' }}>
+                  No leagues available. Create a new league to get started!
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleJoinLeague}>
+                {joinErrors.general && (
+                  <div className="alert alert-error" style={{ marginBottom: '16px' }}>
+                    {joinErrors.general}
+                  </div>
+                )}
+
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label className="form-label">Select League</label>
+                  <select
+                    value={joinFormData.leagueId}
+                    onChange={(e) => setJoinFormData(prev => ({ ...prev, leagueId: e.target.value }))}
+                    className={`form-input ${joinErrors.leagueId ? 'error' : ''}`}
+                  >
+                    <option value="">Choose a league...</option>
+                    {leagues.map(league => (
+                      <option key={league.id} value={league.id}>
+                        {league.name} ({league.is_public ? 'Public' : 'Private'}) - Max {league.max_teams} teams
+                      </option>
+                    ))}
+                  </select>
+                  {joinErrors.leagueId && (
+                    <div className="form-error">{joinErrors.leagueId}</div>
+                  )}
                 </div>
-              )}
 
-              <div className="form-group">
-                <label className="form-label">Select League</label>
-                <select
-                  value={joinFormData.leagueId}
-                  onChange={(e) => setJoinFormData(prev => ({ ...prev, leagueId: e.target.value }))}
-                  className={`form-input ${joinErrors.leagueId ? 'error' : ''}`}
+                <div className="form-group" style={{ marginBottom: '24px' }}>
+                  <label className="form-label">Your Team Name</label>
+                  <input
+                    type="text"
+                    value={joinFormData.teamName}
+                    onChange={(e) => setJoinFormData(prev => ({ ...prev, teamName: e.target.value }))}
+                    className={`form-input ${joinErrors.teamName ? 'error' : ''}`}
+                    placeholder="Enter your team name"
+                  />
+                  {joinErrors.teamName && (
+                    <div className="form-error">{joinErrors.teamName}</div>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isJoining || !joinFormData.leagueId}
+                  style={{ width: '100%', fontSize: '14px' }}
                 >
-                  <option value="">Choose a league...</option>
-                  {leagues.map(league => (
-                    <option key={league.id} value={league.id}>
-                      {league.name} ({league.is_public ? 'Public' : 'Private'}) - Max {league.max_teams} teams
-                    </option>
-                  ))}
-                </select>
-                {joinErrors.leagueId && (
-                  <div className="form-error">{joinErrors.leagueId}</div>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Your Team Name</label>
-                <input
-                  type="text"
-                  value={joinFormData.teamName}
-                  onChange={(e) => setJoinFormData(prev => ({ ...prev, teamName: e.target.value }))}
-                  className={`form-input ${joinErrors.teamName ? 'error' : ''}`}
-                  placeholder="Enter your team name"
-                />
-                {joinErrors.teamName && (
-                  <div className="form-error">{joinErrors.teamName}</div>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary btn-large"
-                disabled={isJoining || !joinFormData.leagueId}
-                style={{ width: '100%' }}
-              >
-                {isJoining ? 'Joining...' : 'Join League'}
-              </button>
-            </form>
-          )}
+                  {isJoining ? '⏳ Joining...' : '🏆 Join League'}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </div>

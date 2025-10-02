@@ -3,6 +3,22 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 
+class Tournament(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    class Meta:
+        db_table = 'tournaments'
+        managed = False
+    
+    def __str__(self):
+        return self.name
+
+
 class UserCreatedLeague(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
@@ -10,6 +26,7 @@ class UserCreatedLeague(models.Model):
     max_teams = models.IntegerField(default=10)
     max_players_per_team = models.IntegerField(default=15)
     is_public = models.BooleanField(default=True)
+    tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='leagues')
     created_at = models.DateTimeField(default=timezone.now)
     
     class Meta:
