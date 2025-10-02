@@ -27,6 +27,42 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from .databricks_rest_client import DatabricksRestClient
 import json
+import time
+import gzip
+from django.http import JsonResponse
+
+# Simple in-memory cache for query results
+query_cache = {}
+CACHE_DURATION = 30  # Cache for 30 seconds
+
+def get_cached_result(cache_key):
+    """Get cached result if it exists and hasn't expired"""
+    if cache_key in query_cache:
+        result, timestamp = query_cache[cache_key]
+        if time.time() - timestamp < CACHE_DURATION:
+            return result
+        else:
+            del query_cache[cache_key]
+    return None
+
+def set_cached_result(cache_key, result):
+    """Cache a result with current timestamp"""
+    query_cache[cache_key] = (result, time.time())
+
+def compressed_response(data, status_code=200):
+    """Return a compressed JSON response for large data"""
+    json_data = json.dumps(data)
+    
+    # Only compress if data is larger than 1KB
+    if len(json_data) > 1024:
+        compressed_data = gzip.compress(json_data.encode('utf-8'))
+        response = JsonResponse(data, status=status_code)
+        response['Content-Encoding'] = 'gzip'
+        response['Content-Length'] = str(len(compressed_data))
+        response.content = compressed_data
+        return response
+    else:
+        return JsonResponse(data, status=status_code)
 
 
 @api_view(['GET', 'POST'])
@@ -146,13 +182,35 @@ def league_teams(request):
     print(f"DEBUG: league_teams() called with method: {request.method}")
     print("=" * 80)
     
-    client = DatabricksRestClient()
-    
     if request.method == 'GET':
-        # Get all teams
+        # Get teams - filter by user if user_id is provided, otherwise get all teams
         try:
-            print("DEBUG: About to execute SQL query for all teams")
-            result = client.execute_sql("SELECT * FROM default.league_teams")
+            user_id = request.GET.get('user_id')
+            league_id = request.GET.get('league_id')
+            
+            # Check cache first
+            cache_key = f"league_teams_{user_id}_{league_id}"
+            cached_result = get_cached_result(cache_key)
+            if cached_result:
+                print(f"DEBUG: Returning cached league teams")
+                return Response(cached_result)
+            
+            client = DatabricksRestClient()
+            
+            # Build SQL query based on filters
+            sql_query = "SELECT * FROM default.league_teams"
+            conditions = []
+            
+            if user_id:
+                conditions.append(f"team_owner_user_id = {user_id}")
+            if league_id:
+                conditions.append(f"league_id = {league_id}")
+            
+            if conditions:
+                sql_query += " WHERE " + " AND ".join(conditions)
+            
+            print(f"DEBUG: About to execute SQL query: {sql_query}")
+            result = client.execute_sql(sql_query)
             print(f"DEBUG: SQL query completed, got result: {bool(result)}")
             if result and 'result' in result and result['result'].get('data_array'):
                 teams = []
@@ -171,7 +229,12 @@ def league_teams(request):
                         'points_against': 0,
                         'league_points': 0,
                         'created_at': row[4]
-                    })
+                        })
+                
+                # Cache the result
+                set_cached_result(cache_key, teams)
+                print(f"DEBUG: Cached league teams")
+                
                 return Response(teams)
             else:
                 return Response([])
@@ -587,14 +650,21 @@ def get_team_players(request, team_id):
     }
     """
     try:
+        # Check cache first
+        cache_key = f"team_players_{team_id}"
+        cached_result = get_cached_result(cache_key)
+        if cached_result:
+            print(f"DEBUG: Returning cached team players for team {team_id}")
+            return Response(cached_result)
+        
         client = DatabricksRestClient()
         
-        # Get players for the team
+        # Optimized query - only select essential fields
         select_sql = f"""
-        SELECT id, player_id, position, fantasy_position, is_starting, original_position, user_id, league_id, created_at, updated_at
+        SELECT id, player_id, position, fantasy_position, is_starting, original_position
         FROM default.team_players 
         WHERE team_id = '{team_id}'
-        ORDER BY created_at ASC
+        ORDER BY is_starting DESC, created_at ASC
         """
         
         result = client.execute_sql(select_sql)
@@ -610,26 +680,29 @@ def get_team_players(request, team_id):
         print(f"DEBUG: get_team_players data_rows: {data_rows}")
         
         for row in data_rows:
+            # Optimized player data - only essential fields
             player_data = {
                 'id': row[0],
                 'player_id': row[1],
                 'position': row[2],
                 'fantasy_position': row[3],
-                'is_starting': row[4],
-                'original_position': row[5],
-                'user_id': row[6],
-                'league_id': row[7],
-                'created_at': row[8],
-                'updated_at': row[9]
+                'is_starting': row[4] == 'true',  # Convert to boolean
+                'original_position': row[5]
             }
-            print(f"DEBUG: get_team_players player: {player_data}")
             players.append(player_data)
         
-        return Response({
+        response_data = {
             'team_id': team_id,
             'players': players,
             'total_players': len(players)
-        })
+        }
+        
+        # Cache the result
+        set_cached_result(cache_key, response_data)
+        print(f"DEBUG: Cached team players for team {team_id}")
+        
+        # Use compressed response for large data
+        return compressed_response(response_data)
         
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
