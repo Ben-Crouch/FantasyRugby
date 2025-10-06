@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft, get_team_players, update_player_position, start_draft, get_draft_status, waiver_claims, process_waivers, trade_proposals, respond_to_trade, tournaments
+from .views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft, get_team_players, update_player_position, start_draft, get_draft_status, waiver_claims, process_waivers, trade_proposals, respond_to_trade, tournaments, chat_messages, chat_participants, update_read_status
 from .admin_views import remove_team_from_league, get_league_admin, is_user_league_admin
 from .authentication import register, login, refresh_token, verify_token, logout
 from .views.draft_views import debug_database
@@ -21,6 +21,10 @@ urlpatterns = [
     path('trades/<str:trade_id>/respond/', respond_to_trade, name='respond_to_trade'),
     path('league-teams/<int:team_id>/players/', get_team_players, name='get_team_players'),
     path('league-teams/<int:team_id>/players/<int:player_id>/', update_player_position, name='update_player_position'),
+    # Chat endpoints
+    path('leagues/<int:league_id>/chat/messages/', chat_messages, name='chat_messages'),
+    path('leagues/<int:league_id>/chat/participants/', chat_participants, name='chat_participants'),
+    path('leagues/<int:league_id>/chat/users/<int:user_id>/read-status/', update_read_status, name='update_read_status'),
     # League admin endpoints
     path('admin/leagues/<int:league_id>/teams/<int:team_id>/remove/', remove_team_from_league, name='remove_team'),
     path('admin/leagues/<int:league_id>/admin-info/', get_league_admin, name='get_league_admin'),

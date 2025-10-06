@@ -9,6 +9,7 @@ This package contains all the REST API view modules organized by functionality:
 - waiver_views: Waiver system
 - trade_views: Trade functionality
 - tournament_views: Tournament data
+- chat_views: Chat functionality
 - utils: Shared utilities and caching
 """
 
@@ -20,6 +21,7 @@ from .draft_views import complete_draft, start_draft, get_draft_status
 from .waiver_views import waiver_claims, process_waivers
 from .trade_views import trade_proposals, respond_to_trade
 from .tournament_views import tournaments
+from .chat_views import chat_messages, chat_participants, update_read_status
 
 __all__ = [
     'user_leagues',
@@ -36,5 +38,8 @@ __all__ = [
     'process_waivers',
     'trade_proposals',
     'respond_to_trade',
-    'tournaments'
+    'tournaments',
+    'chat_messages',
+    'chat_participants',
+    'update_read_status'
 ]
