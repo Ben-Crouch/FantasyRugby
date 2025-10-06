@@ -69,20 +69,20 @@ def get_team_players(request, team_id):
     try:
         client = DatabricksRestClient()
         
-        # Check cache first
+        # Check cache first (temporarily disabled for debugging)
         cache_key = f'team_players_{team_id}'
-        cached_result = get_cached_result(cache_key)
-        if cached_result:
-            print(f"DEBUG: Cached team players for team {team_id}")
-            return Response(cached_result)
+        # cached_result = get_cached_result(cache_key)
+        # if cached_result:
+        #     print(f"DEBUG: Cached team players for team {team_id}")
+        #     return Response(cached_result)
         
         print(f"DEBUG: get_team_players called with team_id: {team_id}")
         
         # Get team players from the team_players table
         sql = f"""
-        SELECT tp.player_id, tp.position, tp.fantasy_position, tp.is_starting, rp.name, rp.team
+        SELECT tp.player_id, tp.position, tp.fantasy_position, tp.is_starting, rp.`Player Name`, rp.Team
         FROM default.team_players tp
-        LEFT JOIN default.rugby_players_25_26 rp ON tp.player_id = rp.Player_ID
+        LEFT JOIN default.rugby_players_25_26 rp ON tp.player_id = rp.`Player ID`
         WHERE tp.team_id = {team_id}
         ORDER BY tp.is_starting DESC, tp.position
         """

@@ -2,6 +2,7 @@ from django.urls import path
 from .views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft, get_team_players, update_player_position, start_draft, get_draft_status, waiver_claims, process_waivers, trade_proposals, respond_to_trade, tournaments
 from .admin_views import remove_team_from_league, get_league_admin, is_user_league_admin
 from .authentication import register, login, refresh_token, verify_token, logout
+from .views.draft_views import debug_database
 
 urlpatterns = [
     # REST API endpoints
@@ -30,4 +31,6 @@ urlpatterns = [
     path('auth/refresh/', refresh_token, name='refresh_token'),
     path('auth/verify/', verify_token, name='verify_token'),
     path('auth/logout/', logout, name='logout'),
+    # Debug endpoints
+    path('debug/database/', debug_database, name='debug_database'),
 ]
