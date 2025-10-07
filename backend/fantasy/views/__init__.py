@@ -22,6 +22,7 @@ from .waiver_views import waiver_claims, process_waivers
 from .trade_views import trade_proposals, respond_to_trade
 from .tournament_views import tournaments
 from .chat_views import chat_messages, chat_participants, update_read_status
+from .matchweek_views import tournament_availability, league_fixtures, next_matchup
 
 __all__ = [
     'user_leagues',
@@ -41,5 +42,8 @@ __all__ = [
     'tournaments',
     'chat_messages',
     'chat_participants',
-    'update_read_status'
+    'update_read_status',
+    'tournament_availability',
+    'league_fixtures',
+    'next_matchup'
 ]

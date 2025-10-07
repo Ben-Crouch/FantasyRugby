@@ -3,9 +3,8 @@ import WaiverClaimModal from './WaiverClaimModal';
 import WaiverSuccessModal from './WaiverSuccessModal';
 import WaiverOrderSidebar from './WaiverOrderSidebar';
 import { leaguesAPI, teamsAPI } from '../services/api';
-import { useLocation } from 'react-router-dom';
 
-const Waivers = ({ selectedTeam, rugbyPlayers, teamPlayers, user }) => {
+const Waivers = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, onLoadRugbyPlayers, isActive }) => {
   const [searchName, setSearchName] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('All');
   const [showClaimModal, setShowClaimModal] = useState(false);
@@ -14,8 +13,48 @@ const Waivers = ({ selectedTeam, rugbyPlayers, teamPlayers, user }) => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successData, setSuccessData] = useState(null);
   const [teams, setTeams] = useState([]);
-  const location = useLocation();
-  const leagueId = location.state?.leagueId;
+  const [activeWaiverView, setActiveWaiverView] = useState('add-drop'); // 'add-drop' or 'order'
+  const [showMenu, setShowMenu] = useState(false);
+  const [allLeaguePlayers, setAllLeaguePlayers] = useState([]); // All players from all teams in the league
+
+  // Load rugby players when component mounts
+  useEffect(() => {
+    if (onLoadRugbyPlayers && rugbyPlayers.length === 0) {
+      onLoadRugbyPlayers();
+    }
+  }, [onLoadRugbyPlayers, rugbyPlayers.length]);
+
+  // Load all players from all teams in the league
+  const loadAllLeaguePlayers = async () => {
+    if (!leagueId || !isActive) return;
+    
+    try {
+      // Get all teams in the league
+      const teamsData = await teamsAPI.getTeamsByLeague(leagueId);
+      if (!teamsData || teamsData.length === 0) {
+        setAllLeaguePlayers([]);
+        return;
+      }
+
+      // Get players from all teams
+      const allPlayers = [];
+      for (const team of teamsData) {
+        try {
+          const teamPlayersResponse = await teamsAPI.getTeamPlayers(team.id);
+          if (teamPlayersResponse && teamPlayersResponse.players) {
+            allPlayers.push(...teamPlayersResponse.players);
+          }
+        } catch (error) {
+          console.warn(`Failed to load players for team ${team.id}:`, error);
+        }
+      }
+
+      setAllLeaguePlayers(allPlayers);
+    } catch (error) {
+      console.error('Error loading all league players:', error);
+      setAllLeaguePlayers([]);
+    }
+  };
 
   const positions = [
     'All',
@@ -44,14 +83,14 @@ const Waivers = ({ selectedTeam, rugbyPlayers, teamPlayers, user }) => {
     return colors[position] || '#95A5A6';
   };
 
-  // Get IDs of players already on the team
-  const myTeamPlayerIds = (teamPlayers || []).map(p => p.player_id?.toString());
+  // Get IDs of players already on ANY team in the league
+  const allLeaguePlayerIds = allLeaguePlayers.map(p => p.player_id?.toString());
 
   // Filter available players
   let filteredPlayers = rugbyPlayers || [];
   
-  // Exclude players already on the team
-  filteredPlayers = filteredPlayers.filter(p => !myTeamPlayerIds.includes(p.id.toString()));
+  // Exclude players already on ANY team in the league
+  filteredPlayers = filteredPlayers.filter(p => !allLeaguePlayerIds.includes(p.id.toString()));
   
   if (selectedPosition !== 'All') {
     filteredPlayers = filteredPlayers.filter(p => p.fantasy_position === selectedPosition);
@@ -72,7 +111,7 @@ const Waivers = ({ selectedTeam, rugbyPlayers, teamPlayers, user }) => {
   // Load waiver claims and teams on mount
   useEffect(() => {
     const loadData = async () => {
-      if (!leagueId) return;
+      if (!leagueId || !isActive) return;
       try {
         // Load waiver claims
         const claims = await leaguesAPI.getWaiverClaims(leagueId);
@@ -80,14 +119,32 @@ const Waivers = ({ selectedTeam, rugbyPlayers, teamPlayers, user }) => {
         
         // Load teams for waiver order
         const teamsData = await teamsAPI.getTeamsByLeague(leagueId);
+        console.log('DEBUG: Waivers - loaded teams:', teamsData);
         setTeams(teamsData || []);
+        
+        // Load all players from all teams in the league
+        await loadAllLeaguePlayers();
       } catch (error) {
         console.error('Error loading waiver data:', error);
       }
     };
     
     loadData();
-  }, [leagueId]);
+  }, [leagueId, isActive]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMenu && !event.target.closest('[data-menu-container]')) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
 
   const handleConfirmClaim = async (playerToAdd, playerToDrop) => {
     try {
@@ -172,34 +229,156 @@ const Waivers = ({ selectedTeam, rugbyPlayers, teamPlayers, user }) => {
     );
   }
 
+  console.log('DEBUG: Waivers render - teams.length:', teams.length, 'activeWaiverView:', activeWaiverView);
+
   return (
     <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
-      {/* Left Sidebar - Waiver Order */}
-      {teams.length > 0 && (
-        <div style={{ width: '280px', flexShrink: 0 }}>
-          <WaiverOrderSidebar
-            teams={teams}
-            selectedTeam={selectedTeam}
-            user={user}
-          />
-        </div>
-      )}
-
       {/* Main Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="card" style={{ marginBottom: '2rem' }}>
+        <div className="card" style={{ marginBottom: '2rem', position: 'relative' }}>
           <div className="card-header">
-            <h3 className="card-title">Waivers - Add/Drop Players</h3>
-            <p style={{ margin: '0.5rem 0 0 0', color: 'var(--dark-gray)', fontSize: '0.95rem' }}>
-              Browse available players and submit waiver claims
-            </p>
+            <div>
+              <h3 className="card-title">
+                {activeWaiverView === 'add-drop' ? 'Waivers - Add/Drop Players' : 'Waiver Order'}
+              </h3>
+              <p style={{ margin: '0.5rem 0 0 0', color: 'var(--dark-gray)', fontSize: '0.95rem' }}>
+                {activeWaiverView === 'add-drop' 
+                  ? 'Browse available players and submit waiver claims'
+                  : 'View the current waiver order for all teams'
+                }
+              </p>
+            </div>
           </div>
           
-          <div style={{ padding: '1rem' }}>
-            {/* Pending Waiver Claims */}
-            {waiverClaims.filter(claim => 
-              claim.team_id === selectedTeam.id && claim.claim_status === 'PENDING'
-            ).length > 0 && (
+          {/* Burger Menu - Top Right */}
+          <div style={{ 
+            position: 'absolute', 
+            top: '16px', 
+            right: '16px',
+            zIndex: 10
+          }} data-menu-container>
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '3px',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '32px',
+                    height: '32px'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--neutral-100)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{ 
+                    width: '18px', 
+                    height: '2px', 
+                    backgroundColor: 'var(--neutral-600)',
+                    borderRadius: '1px'
+                  }}></div>
+                  <div style={{ 
+                    width: '18px', 
+                    height: '2px', 
+                    backgroundColor: 'var(--neutral-600)',
+                    borderRadius: '1px'
+                  }}></div>
+                  <div style={{ 
+                    width: '18px', 
+                    height: '2px', 
+                    backgroundColor: 'var(--neutral-600)',
+                    borderRadius: '1px'
+                  }}></div>
+                </button>
+                
+                {/* Dropdown Menu */}
+                {showMenu && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: '0',
+                    backgroundColor: 'white',
+                    border: '1px solid var(--neutral-200)',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    zIndex: 1000,
+                    minWidth: '200px',
+                    marginTop: '4px'
+                  }}>
+                    <button
+                      onClick={() => {
+                        setActiveWaiverView('add-drop');
+                        setShowMenu(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        border: 'none',
+                        background: activeWaiverView === 'add-drop' ? 'var(--databricks-light-blue)' : 'transparent',
+                        color: activeWaiverView === 'add-drop' ? 'var(--databricks-blue)' : 'var(--neutral-700)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: activeWaiverView === 'add-drop' ? '600' : '400',
+                        borderBottom: '1px solid var(--neutral-100)'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (activeWaiverView !== 'add-drop') {
+                          e.target.style.backgroundColor = 'var(--neutral-50)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (activeWaiverView !== 'add-drop') {
+                          e.target.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      📋 Waivers - Add/Drop Players
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveWaiverView('order');
+                        setShowMenu(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        border: 'none',
+                        background: activeWaiverView === 'order' ? 'var(--databricks-light-blue)' : 'transparent',
+                        color: activeWaiverView === 'order' ? 'var(--databricks-blue)' : 'var(--neutral-700)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: activeWaiverView === 'order' ? '600' : '400'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (activeWaiverView !== 'order') {
+                          e.target.style.backgroundColor = 'var(--neutral-50)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (activeWaiverView !== 'order') {
+                          e.target.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      📊 Waiver Order
+                    </button>
+                  </div>
+                )}
+          </div>
+          
+          {activeWaiverView === 'add-drop' ? (
+            <div style={{ padding: '1rem' }}>
+              {/* Pending Waiver Claims */}
+              {waiverClaims.filter(claim => 
+                claim.team_id === selectedTeam.id && claim.claim_status === 'PENDING'
+              ).length > 0 && (
               <div style={{ 
                 marginBottom: '2rem',
                 padding: '1rem',
@@ -350,6 +529,29 @@ const Waivers = ({ selectedTeam, rugbyPlayers, teamPlayers, user }) => {
                       }}>
                         Team: {player.team}
                       </p>
+                      {/* Fantasy Points Display */}
+                      {player.fantasy_points_per_game !== undefined && (
+                        <div style={{ marginTop: '0.75rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--dark-gray)' }}>Fantasy Points/Game:</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary-orange)' }}>
+                              {player.fantasy_points_per_game}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--dark-gray)' }}>Fantasy Points/Min:</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary-orange)' }}>
+                              {player.fantasy_points_per_minute}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--dark-gray)' }}>Total Fantasy Points:</span>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary-orange)' }}>
+                              {player.total_fantasy_points}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     <button
@@ -382,7 +584,17 @@ const Waivers = ({ selectedTeam, rugbyPlayers, teamPlayers, user }) => {
                 </div>
               )}
             </div>
-          </div>
+            </div>
+          ) : (
+            /* Waiver Order View */
+            <div style={{ padding: '2rem' }}>
+              <WaiverOrderSidebar
+                teams={teams}
+                selectedTeam={selectedTeam}
+                user={user}
+              />
+            </div>
+          )}
         </div>
 
         <WaiverClaimModal

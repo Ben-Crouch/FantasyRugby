@@ -30,7 +30,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import Navbar from './components/Navbar';
+import Header from './components/Header';
+import Footer from './components/Footer';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import LeagueSelection from './pages/LeagueSelection';
@@ -53,7 +54,7 @@ function App() {
       <AuthProvider>
         <Router>
           <div className="App">
-            <Navbar />
+            <Header />
             <main className="main-content">
               <Routes>
                 <Route path="/login" element={<Login />} />
@@ -93,6 +94,7 @@ function App() {
                 <Route path="/" element={<Navigate to="/league-selection" replace />} />
               </Routes>
             </main>
+            <Footer />
           </div>
         </Router>
       </AuthProvider>

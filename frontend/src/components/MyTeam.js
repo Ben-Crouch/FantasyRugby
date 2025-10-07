@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 const MyTeam = ({ 
   selectedTeam,
@@ -10,15 +10,29 @@ const MyTeam = ({
   onMovePlayerToBench,
   onMovePlayerToStarting,
   onShowSwapModal,
-  setSwapData
+  setSwapData,
+  onLoadRugbyPlayers,
+  onLoadTeamPlayers
 }) => {
+  // Load rugby players and team players when component mounts
+  useEffect(() => {
+    if (onLoadRugbyPlayers && rugbyPlayers.length === 0) {
+      onLoadRugbyPlayers();
+    }
+    if (onLoadTeamPlayers && selectedTeam && teamPlayers.length === 0) {
+      onLoadTeamPlayers(selectedTeam.id);
+    }
+  }, [onLoadRugbyPlayers, rugbyPlayers.length, onLoadTeamPlayers, selectedTeam, teamPlayers.length]);
+
   const getPlayerName = (playerId) => {
-    const player = rugbyPlayers.find(p => p.id.toString() === playerId.toString());
+    if (!playerId) return 'Unknown Player';
+    const player = rugbyPlayers.find(p => p.id && p.id.toString() === playerId.toString());
     return player ? player.name : `Player ${playerId}`;
   };
 
   const getPlayerTeam = (playerId) => {
-    const player = rugbyPlayers.find(p => p.id.toString() === playerId.toString());
+    if (!playerId) return '';
+    const player = rugbyPlayers.find(p => p.id && p.id.toString() === playerId.toString());
     return player ? player.team : '';
   };
 
@@ -114,22 +128,87 @@ const MyTeam = ({
     });
   }
 
-  const startingPositions = ['Prop', 'Hooker', 'Lock', 'Back Row', 'Scrum-half', 'Fly-half', 'Centre', 'Back Three'];
-  const benchPlayers = positionGroups['Bench'] || [];
-
-  // Get starting players sorted by position order
-  const startingPlayers = playersToUse.filter(player => 
-    player.is_starting === 'true' || player.is_starting === true
-  );
+  // Define the required starting positions (10 starters + 5 bench = 15 total)
+  const startingPositions = [
+    { position: 'Prop', slots: 1 },
+    { position: 'Hooker', slots: 1 },
+    { position: 'Lock', slots: 1 },
+    { position: 'Back Row', slots: 2 },
+    { position: 'Scrum-half', slots: 1 },
+    { position: 'Fly-half', slots: 1 },
+    { position: 'Centre', slots: 1 },
+    { position: 'Back Three', slots: 2 }
+  ];
   
-  // Sort starting players by position order
-  const sortedStartingPlayers = [...startingPlayers].sort((a, b) => {
-    const posA = a.fantasy_position || positionMapping[a.position] || a.position;
-    const posB = b.fantasy_position || positionMapping[b.position] || b.position;
-    const indexA = startingPositions.indexOf(posA);
-    const indexB = startingPositions.indexOf(posB);
-    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  const benchSlots = 5;
+  const totalStartingSlots = startingPositions.reduce((sum, p) => sum + p.slots, 0);
+
+  // Create roster slots and fill them based on position matching
+  const startingRoster = [];
+  const benchRoster = [];
+  const usedPlayerIndices = new Set();
+  let slotNumber = 1;
+  
+  // Fill starting positions by matching player fantasy_position to slot position
+  startingPositions.forEach(posGroup => {
+    for (let i = 0; i < posGroup.slots; i++) {
+      // Find first available player that matches this position and is starting
+      let matchedPlayer = null;
+      let matchedIndex = -1;
+      
+      for (let j = 0; j < playersToUse.length; j++) {
+        const player = playersToUse[j];
+        const playerFantasyPos = player.fantasy_position || positionMapping[player.position] || player.position;
+        const isStarting = player.is_starting === 'true' || player.is_starting === true;
+        
+        if (!usedPlayerIndices.has(j) && 
+            playerFantasyPos === posGroup.position && 
+            isStarting && 
+            player.fantasy_position !== 'Bench') {
+          matchedPlayer = player;
+          matchedIndex = j;
+          break;
+        }
+      }
+      
+      if (matchedPlayer) {
+        usedPlayerIndices.add(matchedIndex);
+      }
+      
+      startingRoster.push({
+        slotNumber: slotNumber++,
+        position: posGroup.position,
+        player: matchedPlayer
+      });
+    }
   });
+  
+  // Fill bench positions
+  for (let i = 0; i < benchSlots; i++) {
+    let matchedPlayer = null;
+    let matchedIndex = -1;
+    
+    for (let j = 0; j < playersToUse.length; j++) {
+      const player = playersToUse[j];
+      const isBench = (player.is_starting === 'false' || player.is_starting === false);
+      
+      if (!usedPlayerIndices.has(j) && isBench) {
+        matchedPlayer = player;
+        matchedIndex = j;
+        break;
+      }
+    }
+    
+    if (matchedPlayer) {
+      usedPlayerIndices.add(matchedIndex);
+    }
+    
+    benchRoster.push({
+      slotNumber: slotNumber++,
+      position: 'Bench',
+      player: matchedPlayer
+    });
+  }
 
   return (
     <div className="card" style={{ marginBottom: '2rem' }}>
@@ -154,63 +233,79 @@ const MyTeam = ({
             flexDirection: 'column', 
             gap: '0.5rem' 
           }}>
-            {sortedStartingPlayers.map(player => {
-              const fantasyPos = player.fantasy_position || positionMapping[player.position] || player.position;
-              return (
-                <div
-                  key={player.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '0.75rem 1.5rem',
-                    border: '2px solid var(--light-gray)',
-                    borderRadius: '25px',
-                    backgroundColor: 'white',
-                    borderLeft: '4px solid var(--primary-orange)',
-                    transition: 'all 0.2s',
-                    minHeight: '60px'
-                  }}
-                >
-                  {/* Position Pill */}
-                  <div style={{ 
-                    minWidth: '120px',
-                    marginRight: '1rem'
+            {startingRoster.map((slot) => (
+              <div
+                key={`starting-${slot.slotNumber}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0.75rem 1.5rem',
+                  border: slot.player ? '2px solid var(--light-gray)' : '2px dashed var(--light-gray)',
+                  borderRadius: '25px',
+                  backgroundColor: slot.player ? 'white' : 'var(--lightest-gray)',
+                  borderLeft: slot.player ? '4px solid var(--primary-orange)' : '4px dashed var(--light-gray)',
+                  transition: 'all 0.2s',
+                  minHeight: '60px',
+                  opacity: slot.player ? 1 : 0.6
+                }}
+              >
+                {/* Position Pill */}
+                <div style={{ 
+                  minWidth: '120px',
+                  marginRight: '1rem'
+                }}>
+                  <div style={{
+                    display: 'inline-block',
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '15px',
+                    backgroundColor: getPositionColor(slot.position),
+                    color: 'white',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap'
                   }}>
-                    <div style={{
-                      display: 'inline-block',
-                      padding: '0.4rem 0.9rem',
-                      borderRadius: '15px',
-                      backgroundColor: getPositionColor(fantasyPos),
-                      color: 'white',
-                      fontSize: '0.85rem',
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {fantasyPos}
-                    </div>
+                    {slot.position}
                   </div>
-                  
-                  {/* Player Info */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ 
-                      fontSize: '1.1rem',
-                      fontWeight: 'bold',
-                      color: 'var(--black)',
-                      marginBottom: '0.25rem'
-                    }}>
-                      {getPlayerName(player.player_id)}
-                    </div>
+                </div>
+                
+                {/* Player Info or Empty Slot */}
+                <div style={{ flex: 1 }}>
+                  {slot.player ? (
+                    <>
+                      <div style={{ 
+                        fontSize: '1.1rem',
+                        fontWeight: 'bold',
+                        color: 'var(--black)',
+                        marginBottom: '0.25rem'
+                      }}>
+                        {getPlayerName(slot.player.id)}
+                      </div>
+                      <div style={{ 
+                        fontSize: '0.9rem',
+                        color: 'var(--dark-gray)'
+                      }}>
+                        {getPlayerTeam(slot.player.id)}
+                      </div>
+                    </>
+                  ) : (
                     <div style={{ 
                       fontSize: '0.9rem',
-                      color: 'var(--dark-gray)'
+                      color: 'var(--dark-gray)',
+                      fontStyle: 'italic'
                     }}>
-                      {getPlayerTeam(player.player_id)}
+                      Empty slot
                     </div>
-                  </div>
-                  
+                  )}
+                </div>
+                
+                {/* Action Buttons */}
+                {slot.player && (
                   <button
-                    onClick={() => onMovePlayerToBench(player)}
+                    onClick={() => {
+                      console.log('DEBUG: Bench button clicked for player:', slot.player);
+                      onMovePlayerToBench(slot.player);
+                    }}
                     style={{
                       padding: '0.4rem 0.9rem',
                       fontSize: '0.85rem',
@@ -224,109 +319,121 @@ const MyTeam = ({
                   >
                     Bench
                   </button>
-                </div>
-              );
-            })}
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Bench Players */}
-        {playersToUse.filter(player => 
-          player.is_starting === 'false' || player.is_starting === false
-        ).length > 0 && (
-          <div>
-            <h4 style={{ 
-              color: 'var(--primary-orange)', 
-              marginBottom: '1rem',
-              borderBottom: '2px solid var(--primary-orange)',
-              paddingBottom: '0.5rem'
-            }}>
-              Bench Players
-            </h4>
-            
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '0.5rem' 
-            }}>
-              {playersToUse.filter(player => 
-                player.is_starting === 'false' || player.is_starting === false
-              ).map(player => {
-                const fantasyPos = player.fantasy_position || positionMapping[player.position] || player.position;
-                return (
-                  <div
-                    key={player.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '0.75rem 1.5rem',
-                      border: '2px solid var(--light-gray)',
-                      borderRadius: '25px',
-                      backgroundColor: 'white',
-                      borderLeft: '4px solid var(--dark-gray)',
-                      transition: 'all 0.2s',
-                      minHeight: '60px'
-                    }}
-                  >
-                    {/* Position Pill */}
-                    <div style={{ 
-                      minWidth: '120px',
-                      marginRight: '1rem'
-                    }}>
-                      <div style={{
-                        display: 'inline-block',
-                        padding: '0.4rem 0.9rem',
-                        borderRadius: '15px',
-                        backgroundColor: '#95A5A6',
-                        color: 'white',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        Bench
-                      </div>
-                    </div>
-                    
-                    {/* Player Info */}
-                    <div style={{ flex: 1 }}>
+        <div>
+          <h4 style={{ 
+            color: 'var(--primary-orange)', 
+            marginBottom: '1rem',
+            borderBottom: '2px solid var(--primary-orange)',
+            paddingBottom: '0.5rem'
+          }}>
+            Bench Players ({benchRoster.filter(s => s.player).length}/{benchSlots})
+          </h4>
+          
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '0.5rem' 
+          }}>
+            {benchRoster.map((slot) => (
+              <div
+                key={`bench-${slot.slotNumber}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0.75rem 1.5rem',
+                  border: slot.player ? '2px solid var(--light-gray)' : '2px dashed var(--light-gray)',
+                  borderRadius: '25px',
+                  backgroundColor: slot.player ? 'white' : 'var(--lightest-gray)',
+                  borderLeft: slot.player ? '4px solid var(--dark-gray)' : '4px dashed var(--light-gray)',
+                  transition: 'all 0.2s',
+                  minHeight: '60px',
+                  opacity: slot.player ? 1 : 0.6
+                }}
+              >
+                {/* Position Pill */}
+                <div style={{ 
+                  minWidth: '120px',
+                  marginRight: '1rem'
+                }}>
+                  <div style={{
+                    display: 'inline-block',
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '15px',
+                    backgroundColor: '#95A5A6',
+                    color: 'white',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    Bench
+                  </div>
+                </div>
+                
+                {/* Player Info or Empty Slot */}
+                <div style={{ flex: 1 }}>
+                  {slot.player ? (
+                    <>
                       <div style={{ 
                         fontSize: '1.1rem',
                         fontWeight: 'bold',
                         color: 'var(--black)',
                         marginBottom: '0.25rem'
                       }}>
-                        {getPlayerName(player.player_id)}
+                        {getPlayerName(slot.player.id)}
                       </div>
                       <div style={{ 
                         fontSize: '0.9rem',
                         color: 'var(--dark-gray)'
                       }}>
-                        {getPlayerTeam(player.player_id)} • {fantasyPos}
+                        {getPlayerTeam(slot.player.id)} • {slot.player.fantasy_position || positionMapping[slot.player.position] || slot.player.position}
                       </div>
+                    </>
+                  ) : (
+                    <div style={{ 
+                      fontSize: '0.9rem',
+                      color: 'var(--dark-gray)',
+                      fontStyle: 'italic'
+                    }}>
+                      Empty slot
                     </div>
-                    
-                    <button
-                      onClick={() => onMovePlayerToStarting(player, positionMapping[player.position] || player.position)}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        fontSize: '0.85rem',
-                        backgroundColor: '#2ECC71',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '15px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold'
-                      }}
-                    >
-                      Start
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                  )}
+                </div>
+                
+                {/* Action Buttons */}
+                {slot.player && (
+                  <button
+                    onClick={() => {
+                      console.log('DEBUG: Start button clicked for player:', slot.player);
+                      const fantasyPos = slot.player.fantasy_position || positionMapping[slot.player.position] || slot.player.position;
+                      console.log('DEBUG: Calculated fantasy position:', fantasyPos);
+                      onMovePlayerToStarting(slot.player, fantasyPos);
+                    }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.85rem',
+                      backgroundColor: '#2ECC71',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '15px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    Start
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

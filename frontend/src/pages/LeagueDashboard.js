@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { leaguesAPI, teamsAPI, rugbyPlayersAPI } from '../services/api';
+import { leaguesAPI, teamsAPI, rugbyPlayersAPI, tournamentsAPI } from '../services/api';
 import NavigationBar from '../components/NavigationBar';
 import LeagueTable from '../components/LeagueTable';
 import MyTeam from '../components/MyTeam';
 import SwapModal from '../components/SwapModal';
 import Waivers from '../components/Waivers';
 import Trade from '../components/Trade';
+import Chat from '../components/Chat';
+import Fixtures from '../components/Fixtures';
+import Matchup from '../components/Matchup';
 
 const LeagueDashboard = () => {
   const [leagueData, setLeagueData] = useState(null);
@@ -23,15 +26,54 @@ const LeagueDashboard = () => {
   const [localTeamPlayers, setLocalTeamPlayers] = useState([]);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [swapData, setSwapData] = useState(null);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [infoModalData, setInfoModalData] = useState(null);
   const [draftComplete, setDraftComplete] = useState(false);
   const [draftStatus, setDraftStatus] = useState('NOT_STARTED');
+  const [loadingRugbyPlayers, setLoadingRugbyPlayers] = useState(false);
+  const [tournamentData, setTournamentData] = useState(null);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const hasLoadedData = useRef(false);
 
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Load tournament data
+  const loadTournamentData = async () => {
+    if (!leagueData?.tournament_id || tournamentData) return;
+    
+    try {
+      const tournaments = await tournamentsAPI.getTournaments();
+      const tournament = tournaments.find(t => t.id && t.id.toString() === leagueData.tournament_id.toString());
+      setTournamentData(tournament);
+    } catch (error) {
+      console.error('Error loading tournament data:', error);
+    }
+  };
+
+  // Lazy load rugby players when needed
+  const loadRugbyPlayers = async () => {
+    if (rugbyPlayers.length > 0 || loadingRugbyPlayers) return;
+    
+    setLoadingRugbyPlayers(true);
+    try {
+      const tournamentId = leagueData?.tournament_id;
+      const allRugbyPlayers = await rugbyPlayersAPI.getPlayers(tournamentId);
+      setRugbyPlayers(allRugbyPlayers);
+    } catch (error) {
+      console.error('Error loading rugby players:', error);
+    } finally {
+      setLoadingRugbyPlayers(false);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
+      // Prevent duplicate loading
+      if (hasLoadedData.current) return;
+      hasLoadedData.current = true;
+      
       setLoading(true);
       setError(null);
       
@@ -62,13 +104,18 @@ const LeagueDashboard = () => {
           }
         }
         
+        // Fetch league data first (single API call)
+        console.log('DEBUG: Fetching leagues');
+        const leagues = await leaguesAPI.getLeagues();
+        console.log('DEBUG: All leagues:', leagues);
+        console.log('DEBUG: Leagues API response type:', typeof leagues, 'is array:', Array.isArray(leagues));
+        
         if (!leagueId) {
           console.log('No league ID provided, using fallback');
           setLoading(true); // Show loading while finding fallback league
-          const allLeagues = await leaguesAPI.getLeagues();
-          if (allLeagues && allLeagues.length > 0) {
+          if (leagues && leagues.length > 0) {
             // Try to find a league where the user is actually a member
-            const userLeagues = allLeagues.filter(league => 
+            const userLeagues = leagues.filter(league => 
               league.teams && league.teams.some(team => 
                 team.team_owner === user?.id || team.team_owner_user_id === user?.id
               )
@@ -79,12 +126,12 @@ const LeagueDashboard = () => {
               console.log('Using fallback league ID where user is a member:', leagueId);
             } else {
               // Fallback to any league with teams
-              const leaguesWithTeams = allLeagues.filter(league => league.teams && league.teams.length > 0);
+              const leaguesWithTeams = leagues.filter(league => league.teams && league.teams.length > 0);
               if (leaguesWithTeams.length > 0) {
                 leagueId = leaguesWithTeams[0].id;
                 console.log('Using fallback league ID with teams:', leagueId);
               } else {
-                leagueId = allLeagues[0].id;
+                leagueId = leagues[0].id;
                 console.log('Using fallback league ID (first available):', leagueId);
               }
             }
@@ -101,11 +148,8 @@ const LeagueDashboard = () => {
           console.log('Stored league ID in localStorage:', leagueId);
         }
         
-        // Fetch league data
-        console.log('DEBUG: Fetching leagues for leagueId:', leagueId);
-        const leagues = await leaguesAPI.getLeagues();
-        console.log('DEBUG: All leagues:', leagues);
-        console.log('DEBUG: Leagues API response type:', typeof leagues, 'is array:', Array.isArray(leagues));
+        // Find the specific league
+        console.log('DEBUG: Finding league for leagueId:', leagueId);
         const league = leagues.find(l => l.id === leagueId);
         console.log('DEBUG: Found league:', league);
         
@@ -123,62 +167,34 @@ const LeagueDashboard = () => {
           });
         }
         
-        // Fetch teams in the league
+        // Fetch teams in the league - use efficient API call
         console.log('DEBUG: Fetching teams for leagueId:', leagueId);
-        const allTeams = await teamsAPI.getTeams();
-        console.log('DEBUG: All teams:', allTeams);
-        console.log('DEBUG: Teams API response type:', typeof allTeams, 'is array:', Array.isArray(allTeams));
-        const teamsData = allTeams.filter(team => team.league_id === leagueId);
+        const teamsData = await teamsAPI.getTeamsByLeague(leagueId);
         console.log('DEBUG: Teams for this league:', teamsData);
         setTeams(teamsData || []);
         
-        // Check if draft is complete by checking if any team has players
-        if (teamsData && teamsData.length > 0) {
-          try {
-            const teamWithPlayers = await Promise.all(
-              teamsData.map(async (team) => {
-                try {
-                  const response = await teamsAPI.getTeamPlayers(team.id);
-                  const players = response?.players || [];
-                  console.log(`DEBUG: Team ${team.id} has ${players.length} players`);
-                  return players.length > 0;
-                } catch (error) {
-                  console.warn(`Could not fetch players for team ${team.id}:`, error);
-                  return false;
-                }
-              })
-            );
-            
-            const hasPlayers = teamWithPlayers.some(hasPlayers => hasPlayers);
-            console.log('DEBUG: Draft completion check - teamWithPlayers:', teamWithPlayers);
-            console.log('DEBUG: Draft completion check - hasPlayers:', hasPlayers);
-            setDraftComplete(hasPlayers);
-            console.log('DEBUG: Draft completion check - setDraftComplete to:', hasPlayers);
-            
-            // Auto-select user's team if available
-            if (user && user.id) {
-              console.log('DEBUG: Looking for user team - user.id:', user.id);
-              console.log('DEBUG: Available teams:', teamsData);
-              const userTeam = teamsData.find(team => team.team_owner === user.id);
-              console.log('DEBUG: Found userTeam by team_owner:', userTeam);
-              if (userTeam) {
-                setSelectedTeam(userTeam);
-                loadTeamPlayers(userTeam.id);
-              } else {
-                const userTeamByUserId = teamsData.find(team => team.team_owner_user_id === user.id);
-                console.log('DEBUG: Found userTeam by team_owner_user_id:', userTeamByUserId);
-                if (userTeamByUserId) {
-                  setSelectedTeam(userTeamByUserId);
-                  loadTeamPlayers(userTeamByUserId.id);
-                } else {
-                  console.log('DEBUG: No team found for user');
-                }
-              }
+        // Skip the expensive draft completion check - we'll rely on draft status API instead
+        console.log('DEBUG: Skipping expensive draft completion check');
+        setDraftComplete(false); // Will be updated by draft status API call
+        
+        // Auto-select user's team if available
+        if (user && user.id) {
+          console.log('DEBUG: Looking for user team - user.id:', user.id);
+          console.log('DEBUG: Available teams:', teamsData);
+          const userTeam = teamsData.find(team => team.team_owner === user.id);
+          console.log('DEBUG: Found userTeam by team_owner:', userTeam);
+          if (userTeam) {
+            setSelectedTeam(userTeam);
+            // Don't load team players immediately - let components load them when needed
+          } else {
+            const userTeamByUserId = teamsData.find(team => team.team_owner_user_id === user.id);
+            console.log('DEBUG: Found userTeam by team_owner_user_id:', userTeamByUserId);
+            if (userTeamByUserId) {
+              setSelectedTeam(userTeamByUserId);
+              // Don't load team players immediately - let components load them when needed
+            } else {
+              console.log('DEBUG: No team found for user');
             }
-            
-          } catch (error) {
-            console.warn('Could not check draft completion status:', error);
-            setDraftComplete(false);
           }
         }
         
@@ -198,9 +214,9 @@ const LeagueDashboard = () => {
           setIsAdmin(false);
         }
         
-        // Load rugby players for name mapping
-        const allRugbyPlayers = await rugbyPlayersAPI.getPlayers();
-        setRugbyPlayers(allRugbyPlayers);
+        // Load rugby players for name mapping - only load when needed
+        // This will be loaded lazily when components actually need it
+        setRugbyPlayers([]);
         
         // Load draft status
         try {
@@ -222,7 +238,22 @@ const LeagueDashboard = () => {
     };
     
     loadData();
-  }, [location.state, user]);
+  }, [location.state?.leagueId]);
+
+  // Load tournament data when leagueData changes
+  useEffect(() => {
+    if (leagueData?.tournament_id) {
+      loadTournamentData();
+    }
+  }, [leagueData?.tournament_id]);
+
+  // Redirect from post-draft tabs if draft is not complete
+  useEffect(() => {
+    const postDraftTabs = ['waivers', 'trade', 'fixtures', 'matchup'];
+    if (postDraftTabs.includes(activeTab) && !draftComplete) {
+      setActiveTab('league');
+    }
+  }, [activeTab, draftComplete]);
 
   const loadTeamPlayers = async (teamId) => {
     console.log('DEBUG: loadTeamPlayers called with teamId:', teamId);
@@ -242,6 +273,15 @@ const LeagueDashboard = () => {
     }
   };
 
+  // Helper function to get player name from rugby players data
+  const getPlayerName = (playerId) => {
+    console.log('DEBUG: getPlayerName called with playerId:', playerId, 'rugbyPlayers length:', rugbyPlayers.length);
+    if (!playerId) return 'Unknown Player';
+    const player = rugbyPlayers.find(p => p.id && p.id.toString() === playerId.toString());
+    console.log('DEBUG: Found player:', player);
+    return player ? player.name : `Player ${playerId}`;
+  };
+
   const handleStartDraft = () => {
     navigate('/draft', { 
       state: { 
@@ -251,46 +291,13 @@ const LeagueDashboard = () => {
     });
   };
 
-  const movePlayerToBench = async (player) => {
-    try {
-      const response = await fetch(`/api/league-teams/${selectedTeam.id}/players/${player.id}/`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          fantasy_position: 'Bench',
-          is_starting: false
-        })
-      });
-
-      if (response.ok) {
-        // Update local state
-        setLocalTeamPlayers(prev => 
-          prev.map(p => 
-            p.id === player.id 
-              ? { ...p, fantasy_position: 'Bench', is_starting: false }
-              : p
-          )
-        );
-      } else {
-        console.error('Failed to move player to bench');
-      }
-    } catch (error) {
-      console.error('Error moving player to bench:', error);
-    }
+  const handleChatUnreadCountChange = (count) => {
+    setChatUnreadCount(count);
   };
 
-  const movePlayerToStarting = async (player, targetPosition) => {
+  const movePlayerToBench = async (player) => {
+    console.log('DEBUG: movePlayerToBench called with player:', player);
     if (!player) return;
-    
-    // Get the rugby player data to check their actual position
-    const rugbyPlayer = rugbyPlayers.find(p => p.id.toString() === player.player_id.toString());
-    if (!rugbyPlayer) {
-      console.error('Rugby player not found');
-      return;
-    }
     
     // Map actual positions to fantasy positions
     const positionMapping = {
@@ -306,14 +313,90 @@ const LeagueDashboard = () => {
       'Fullback': 'Back Three'
     };
     
-    // Check if the player can play in the target position
-    const playerFantasyPosition = rugbyPlayer.fantasy_position || positionMapping[rugbyPlayer.position];
+    // Get the player's fantasy position from team player data
+    const playerFantasyPosition = player.fantasy_position || positionMapping[player.position] || player.position;
+    
+    // Check if there are bench players in the same position that could be swapped
+    const currentBenchPlayers = localTeamPlayers.filter(p => {
+      const pFantasyPosition = p.fantasy_position || positionMapping[p.position] || p.position;
+      const isBenchPlayer = (p.is_starting === 'false' || p.is_starting === false);
+      const matchesPlayerPosition = pFantasyPosition === playerFantasyPosition;
+      const isNotCurrentPlayer = p.id !== player.id;
+      
+      return matchesPlayerPosition && isBenchPlayer && isNotCurrentPlayer;
+    });
+    
+    console.log('DEBUG: Bench players check:', {
+      playerFantasyPosition,
+      currentBenchPlayers: currentBenchPlayers.length,
+      currentBenchPlayersList: currentBenchPlayers.map(p => ({ id: p.id, name: getPlayerName(p.id), fantasy_position: p.fantasy_position, is_starting: p.is_starting }))
+    });
+    
+    if (currentBenchPlayers.length > 0) {
+      console.log('DEBUG: Showing swap modal for bench players');
+      // Show swap modal
+      setSwapData({
+        player: player,
+        currentPlayers: currentBenchPlayers,
+        targetPosition: 'Bench',
+        newPlayerName: getPlayerName(player.id),
+        selectedCurrentPlayer: null
+      });
+      setShowSwapModal(true);
+      return;
+    }
+    
+    console.log('DEBUG: No conflicting bench players, showing info modal');
+    // No bench players in same position, show informational modal
+    setInfoModalData({
+      title: 'Cannot Move to Bench',
+      message: `There are no other ${playerFantasyPosition} players on the bench to swap with. This player cannot be moved to the bench without a swap.`,
+      playerName: getPlayerName(player.id),
+      playerPosition: playerFantasyPosition
+    });
+    setShowInfoModal(true);
+    return;
+  };
+
+  const movePlayerToStarting = async (player, targetPosition) => {
+    console.log('DEBUG: movePlayerToStarting called with player:', player, 'targetPosition:', targetPosition);
+    if (!player) return;
+    
+    // Map actual positions to fantasy positions
+    const positionMapping = {
+      'Prop': 'Prop',
+      'Hooker': 'Hooker', 
+      'Lock': 'Lock',
+      'Flanker': 'Back Row',
+      'No. 8': 'Back Row',
+      'Scrum-half': 'Scrum-half',
+      'Fly-half': 'Fly-half',
+      'Centre': 'Centre',
+      'Wing': 'Back Three',
+      'Fullback': 'Back Three'
+    };
+    
+    // Use the team player's position data instead of rugby player data
+    const playerFantasyPosition = player.fantasy_position || positionMapping[player.position] || player.position;
+    
     if (playerFantasyPosition !== targetPosition) {
       alert(`This player (${playerFantasyPosition}) cannot play as ${targetPosition}.`);
       return;
     }
     
-    // Check if there are already players in that starting position
+    // Define position capacities (how many players can play in each position)
+    const positionCapacities = {
+      'Prop': 1,
+      'Hooker': 1,
+      'Lock': 1,
+      'Back Row': 2,
+      'Scrum-half': 1,
+      'Fly-half': 1,
+      'Centre': 1,
+      'Back Three': 2
+    };
+    
+    // Check how many players are currently in that starting position
     const currentStartingPlayers = localTeamPlayers.filter(p => {
       const pFantasyPosition = p.fantasy_position || positionMapping[p.position] || p.position;
       const isStartingPlayer = (p.is_starting === 'true' || p.is_starting === true) && p.fantasy_position !== 'Bench';
@@ -323,106 +406,85 @@ const LeagueDashboard = () => {
       return matchesTargetPosition && isStartingPlayer && isNotCurrentPlayer;
     });
     
-    if (currentStartingPlayers.length > 0) {
-      // Show swap modal
-      const getPlayerName = (playerId) => {
-        const p = rugbyPlayers.find(rp => rp.id.toString() === playerId.toString());
-        return p ? p.name : `Player ${playerId}`;
-      };
-      
-      setSwapData({
-        player: player,
-        currentPlayers: currentStartingPlayers,
-        targetPosition: targetPosition,
-        newPlayerName: getPlayerName(player.player_id),
-        selectedCurrentPlayer: null
-      });
-      setShowSwapModal(true);
-      return;
-    }
+    const positionCapacity = positionCapacities[targetPosition] || 1;
+    const isPositionFull = currentStartingPlayers.length >= positionCapacity;
     
-    // No current player in that position, just move the player
-    try {
-      const response = await fetch(`/api/league-teams/${selectedTeam.id}/players/${player.id}/`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          fantasy_position: targetPosition,
-          is_starting: true
-        })
-      });
-
-      if (response.ok) {
-        // Update local state
-        setLocalTeamPlayers(prev => 
-          prev.map(p => 
-            p.id === player.id 
-              ? { ...p, fantasy_position: targetPosition, is_starting: true }
-              : p
-          )
-        );
-      } else {
-        console.error('Failed to move player to starting position');
-      }
-    } catch (error) {
-      console.error('Error moving player to starting position:', error);
-    }
+    console.log('DEBUG: Position capacity check:', {
+      targetPosition,
+      positionCapacity,
+      currentStartingPlayers: currentStartingPlayers.length,
+      isPositionFull,
+      currentStartingPlayersList: currentStartingPlayers.map(p => ({ id: p.id, name: getPlayerName(p.id), fantasy_position: p.fantasy_position, is_starting: p.is_starting }))
+    });
+    
+    // Always show swap modal for starting positions to let user choose which player to replace
+    console.log('DEBUG: Showing swap modal for starting position');
+    setSwapData({
+      player: player,
+      currentPlayers: currentStartingPlayers,
+      targetPosition: targetPosition,
+      newPlayerName: getPlayerName(player.id),
+      selectedCurrentPlayer: null
+    });
+    setShowSwapModal(true);
+    return;
   };
 
   const confirmSwap = async () => {
     if (!swapData || !swapData.selectedCurrentPlayer) return;
 
     try {
-      // Update the bench player to starting position (bypass the check)
-      const benchToStartingResponse = await fetch(`/api/league-teams/${selectedTeam.id}/players/${swapData.player.id}/`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          fantasy_position: swapData.targetPosition,
-          is_starting: true
-        })
+      // Determine the swap direction based on targetPosition
+      const isMovingToBench = swapData.targetPosition === 'Bench';
+      
+      // Update the first player (the one being moved)
+      const firstPlayerResponse = await teamsAPI.updatePlayerPosition(selectedTeam.id, swapData.player.id, {
+        fantasy_position: swapData.targetPosition,
+        is_starting: !isMovingToBench
       });
       
-      // Update the starting player to bench
-      const startingToBenchResponse = await fetch(`/api/league-teams/${selectedTeam.id}/players/${swapData.selectedCurrentPlayer.id}/`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          fantasy_position: 'Bench',
-          is_starting: false
-        })
+      // Update the second player (the one being swapped out)
+      const secondPlayerResponse = await teamsAPI.updatePlayerPosition(selectedTeam.id, swapData.selectedCurrentPlayer.id, {
+        fantasy_position: isMovingToBench ? swapData.selectedCurrentPlayer.fantasy_position : 'Bench',
+        is_starting: isMovingToBench
       });
 
-      if (benchToStartingResponse.ok && startingToBenchResponse.ok) {
+      if (firstPlayerResponse && secondPlayerResponse) {
         // Update local state for both players
         setLocalTeamPlayers(prev => 
           prev.map(p => {
             if (p.id === swapData.player.id) {
-              return { ...p, fantasy_position: swapData.targetPosition, is_starting: true };
+              return { ...p, fantasy_position: swapData.targetPosition, is_starting: !isMovingToBench };
             }
             if (p.id === swapData.selectedCurrentPlayer.id) {
-              return { ...p, fantasy_position: 'Bench', is_starting: false };
+              return { 
+                ...p, 
+                fantasy_position: isMovingToBench ? swapData.selectedCurrentPlayer.fantasy_position : 'Bench', 
+                is_starting: isMovingToBench 
+              };
             }
             return p;
           })
         );
+        console.log(`✅ Successfully swapped players`);
       } else {
         console.error('Failed to swap players');
+        alert('Failed to swap players. Please try again.');
       }
       
       setShowSwapModal(false);
       setSwapData(null);
     } catch (error) {
       console.error('Error confirming swap:', error);
+      
+      // Check if it's a timeout error
+      if (error.message && error.message.includes('timeout')) {
+        alert('The swap request is taking longer than expected. This might be due to network issues. Please try again in a moment.');
+      } else if (error.message && error.message.includes('Databricks API request failed')) {
+        alert('There was a problem connecting to the database. Please try again in a moment.');
+      } else {
+        alert('An error occurred while swapping players. Please try again.');
+      }
     }
   };
 
@@ -467,12 +529,14 @@ const LeagueDashboard = () => {
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <NavigationBar
         leagueData={leagueData}
+        tournamentData={tournamentData}
         isAdmin={isAdmin}
         draftComplete={draftComplete}
         draftStatus={draftStatus}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onStartDraft={handleStartDraft}
+        chatUnreadCount={chatUnreadCount}
       />
 
       {activeTab === 'league' && (
@@ -499,19 +563,24 @@ const LeagueDashboard = () => {
           onMovePlayerToStarting={movePlayerToStarting}
           onShowSwapModal={setShowSwapModal}
           setSwapData={setSwapData}
+          onLoadRugbyPlayers={loadRugbyPlayers}
+          onLoadTeamPlayers={loadTeamPlayers}
         />
       )}
 
-      {activeTab === 'waivers' && (
+      {activeTab === 'waivers' && draftComplete && (
         <Waivers
           selectedTeam={selectedTeam}
           rugbyPlayers={rugbyPlayers}
           teamPlayers={localTeamPlayers.length > 0 ? localTeamPlayers : teamPlayers}
           user={user}
+          leagueId={leagueData?.id}
+          onLoadRugbyPlayers={loadRugbyPlayers}
+          isActive={activeTab === 'waivers'}
         />
       )}
 
-      {activeTab === 'trade' && (
+      {activeTab === 'trade' && draftComplete && (
         <Trade
           selectedTeam={selectedTeam}
           rugbyPlayers={rugbyPlayers}
@@ -519,6 +588,32 @@ const LeagueDashboard = () => {
           user={user}
           leagueId={leagueData?.id}
           allTeams={teams}
+          onLoadRugbyPlayers={loadRugbyPlayers}
+          isActive={activeTab === 'trade'}
+        />
+      )}
+
+      {activeTab === 'fixtures' && draftComplete && (
+        <Fixtures
+          leagueId={leagueData?.id}
+          user={user}
+          isActive={activeTab === 'fixtures'}
+        />
+      )}
+
+      {activeTab === 'matchup' && draftComplete && (
+        <Matchup
+          leagueId={leagueData?.id}
+          user={user}
+          isActive={activeTab === 'matchup'}
+        />
+      )}
+
+      {activeTab === 'chat' && (
+        <Chat
+          leagueId={leagueData?.id}
+          isActive={activeTab === 'chat'}
+          onUnreadCountChange={handleChatUnreadCountChange}
         />
       )}
 
@@ -530,6 +625,86 @@ const LeagueDashboard = () => {
         onCancelSwap={cancelSwap}
         rugbyPlayers={rugbyPlayers}
       />
+
+      {/* Informational Modal */}
+      {showInfoModal && infoModalData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          }}>
+            <h3 style={{
+              margin: '0 0 1rem 0',
+              color: 'var(--primary-orange)',
+              fontSize: '1.5rem',
+              fontWeight: 'bold'
+            }}>
+              {infoModalData.title}
+            </h3>
+            
+            <div style={{
+              marginBottom: '1.5rem',
+              lineHeight: '1.6'
+            }}>
+              <p style={{
+                margin: '0 0 1rem 0',
+                color: 'var(--black)',
+                fontSize: '1rem'
+              }}>
+                <strong>{infoModalData.playerName}</strong> ({infoModalData.playerPosition})
+              </p>
+              
+              <p style={{
+                margin: 0,
+                color: 'var(--dark-gray)',
+                fontSize: '0.95rem'
+              }}>
+                {infoModalData.message}
+              </p>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem'
+            }}>
+              <button
+                onClick={() => setShowInfoModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: 'var(--primary-orange)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = '#e67e22'}
+                onMouseOut={(e) => e.target.style.backgroundColor = 'var(--primary-orange)'}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

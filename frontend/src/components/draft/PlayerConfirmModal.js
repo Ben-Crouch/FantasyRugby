@@ -57,6 +57,42 @@ const PlayerConfirmModal = ({ player, onConfirm, onCancel }) => {
           }}>
             <strong>Team:</strong> {player.team}
           </p>
+          {/* Fantasy Points Display */}
+          {player.fantasy_points_per_game !== undefined && (
+            <div style={{ 
+              marginTop: '1rem', 
+              padding: '1rem', 
+              backgroundColor: 'white', 
+              borderRadius: '6px',
+              border: '1px solid var(--light-gray)'
+            }}>
+              <h4 style={{ 
+                margin: '0 0 0.75rem 0', 
+                color: 'var(--black)',
+                fontSize: '1.2rem'
+              }}>
+                Fantasy Points
+              </h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '1rem', color: 'var(--dark-gray)' }}>Points/Game:</span>
+                <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--primary-orange)' }}>
+                  {player.fantasy_points_per_game}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '1rem', color: 'var(--dark-gray)' }}>Points/Minute:</span>
+                <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--primary-orange)' }}>
+                  {player.fantasy_points_per_minute}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '1rem', color: 'var(--dark-gray)' }}>Total Points:</span>
+                <span style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--primary-orange)' }}>
+                  {player.total_fantasy_points}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         <p style={{ 

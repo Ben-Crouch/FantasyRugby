@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 export const useDraftState = (teams, availablePlayers = []) => {
   const [draftStarted, setDraftStarted] = useState(false);
+  const [draftPaused, setDraftPaused] = useState(false);
   const [currentPick, setCurrentPick] = useState(1);
   const [currentTeam, setCurrentTeam] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState(90);
@@ -65,10 +66,11 @@ export const useDraftState = (teams, availablePlayers = []) => {
       : pickInRound;
 
     console.log(`📍 Next pick: #${currentPick + 1}, Round ${roundNumber + 1}, Pick in round: ${pickInRound + 1}, Reverse: ${isReverseRound}, Team index: ${nextTeamIndex}`);
-    setCurrentTeam(draftOrder[nextTeamIndex]);
-  }, [currentPick, teams.length, draftOrder]);
+    const teamList = draftOrder.length > 0 ? draftOrder : teams;
+    setCurrentTeam(teamList[nextTeamIndex]);
+  }, [currentPick, teams.length, teams, draftOrder]);
 
-  // Auto-pick for inactive users
+  // Auto-pick for inactive users - selects player with highest fantasy points per game
   const autoPickPlayer = useCallback(() => {
     if (!currentTeam || !availablePlayers || availablePlayers.length === 0) return null;
     
@@ -81,19 +83,26 @@ export const useDraftState = (teams, availablePlayers = []) => {
     
     if (available.length === 0) return null;
     
-    // Pick a random player from top 10 available (or all if less than 10)
-    const randomPlayer = available[Math.floor(Math.random() * Math.min(10, available.length))];
+    // Sort available players by fantasy points per game (highest first)
+    const sortedByFantasyPoints = available.sort((a, b) => {
+      const aPoints = a.fantasy_points_per_game || 0;
+      const bPoints = b.fantasy_points_per_game || 0;
+      return bPoints - aPoints; // Descending order (highest first)
+    });
     
-    if (randomPlayer) {
-      console.log(`🤖 AUTO-PICK: ${randomPlayer.name} (${randomPlayer.fantasy_position}) for ${currentTeam.team_name}`);
-      return randomPlayer;
+    // Pick the player with the highest fantasy points per game
+    const bestPlayer = sortedByFantasyPoints[0];
+    
+    if (bestPlayer) {
+      console.log(`🤖 AUTO-PICK: ${bestPlayer.name} (${bestPlayer.fantasy_position}) - ${bestPlayer.fantasy_points_per_game} FP/Game for ${currentTeam.team_name}`);
+      return bestPlayer;
     }
     return null;
   }, [currentTeam, availablePlayers, selectedPlayers]);
 
   // Auto-pick immediately for inactive users when it's their turn
   useEffect(() => {
-    if (!draftStarted || draftComplete || !currentTeam) {
+    if (!draftStarted || draftComplete || draftPaused || !currentTeam) {
       return;
     }
 
@@ -137,11 +146,11 @@ export const useDraftState = (teams, availablePlayers = []) => {
       
       return () => clearTimeout(autoPickTimeout);
     }
-  }, [draftStarted, draftComplete, currentTeam, activeUsers, autoPickPlayer, selectedPlayers, handleNextPick]);
+  }, [draftStarted, draftComplete, draftPaused, currentTeam, activeUsers, autoPickPlayer, selectedPlayers, handleNextPick]);
 
   // Timer effect for active users
   useEffect(() => {
-    if (!draftStarted || draftComplete) {
+    if (!draftStarted || draftComplete || draftPaused) {
       if (autoPickTimerRef.current) {
         clearTimeout(autoPickTimerRef.current);
       }
@@ -175,21 +184,32 @@ export const useDraftState = (teams, availablePlayers = []) => {
         clearTimeout(autoPickTimerRef.current);
       }
     };
-  }, [draftStarted, draftComplete, currentTeam, activeUsers, timeRemaining]);
+  }, [draftStarted, draftComplete, draftPaused, currentTeam, activeUsers, timeRemaining]);
 
   const handleStartDraft = useCallback(() => {
     if (teams.length === 0) return;
     setDraftStarted(true);
     setCurrentPick(1);
-    setCurrentTeam(draftOrder[0]);
+    const teamList = draftOrder.length > 0 ? draftOrder : teams;
+    setCurrentTeam(teamList[0]);
     setTimeRemaining(90);
-  }, [teams.length, draftOrder]);
+  }, [teams.length, teams, draftOrder]);
 
   const handleShuffleDraft = useCallback(() => {
     const shuffled = [...teams].sort(() => Math.random() - 0.5);
     setDraftOrder(shuffled);
     setCurrentTeam(shuffled[0]);
   }, [teams]);
+
+  const handlePauseDraft = useCallback(() => {
+    setDraftPaused(true);
+    console.log('⏸️ Draft paused');
+  }, []);
+
+  const handleResumeDraft = useCallback(() => {
+    setDraftPaused(false);
+    console.log('▶️ Draft resumed');
+  }, []);
 
   const handleSelectPlayer = useCallback((player, teamId) => {
     setSelectedPlayers((prev) => {
@@ -225,6 +245,7 @@ export const useDraftState = (teams, availablePlayers = []) => {
 
   return {
     draftStarted,
+    draftPaused,
     currentPick,
     currentTeam,
     timeRemaining,
@@ -234,6 +255,8 @@ export const useDraftState = (teams, availablePlayers = []) => {
     setDraftComplete,
     handleStartDraft,
     handleShuffleDraft,
+    handlePauseDraft,
+    handleResumeDraft,
     handleSelectPlayer,
     markUserActive,
     markUserInactive,

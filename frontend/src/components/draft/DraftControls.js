@@ -5,6 +5,7 @@ const DraftControls = ({
   isAdmin, 
   onStartDraft, 
   onShuffleDraft,
+  onViewDraftOrder,
   disabled 
 }) => {
   if (draftStarted) {
@@ -15,7 +16,7 @@ const DraftControls = ({
     <div className="card" style={{ marginBottom: '2rem', textAlign: 'center' }}>
       <h2 style={{ marginBottom: '1rem' }}>Draft Controls</h2>
       {isAdmin ? (
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             onClick={onStartDraft}
             disabled={disabled}
@@ -49,6 +50,21 @@ const DraftControls = ({
             }}
           >
             Shuffle Draft Order
+          </button>
+          <button
+            onClick={onViewDraftOrder}
+            style={{
+              backgroundColor: 'var(--databricks-blue)',
+              color: 'white',
+              border: 'none',
+              padding: '1rem 2rem',
+              borderRadius: '6px',
+              fontSize: '1.2rem',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            📊 View Draft Order
           </button>
         </div>
       ) : (

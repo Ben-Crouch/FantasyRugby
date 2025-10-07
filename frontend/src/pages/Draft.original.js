@@ -146,7 +146,7 @@ const Draft = () => {
     nextPick();
   };
 
-  // Auto-pick function wrapped in useCallback
+  // Auto-pick function wrapped in useCallback - selects player with highest fantasy points per game
   const autoPick = useCallback(() => {
     console.log('Auto-pick triggered', { currentTeam, draftComplete, availablePlayers: availablePlayers.length });
     if (!currentTeam || draftComplete) {
@@ -158,25 +158,48 @@ const Draft = () => {
     const neededPositions = getNeededPositions(teamPlayers);
     console.log('Team players:', teamPlayers.length, 'Needed positions:', neededPositions);
     
-    // Find best available player for needed positions
+    // Filter out already selected players
+    const allSelectedPlayerIds = Object.values(selectedPlayers)
+      .flat()
+      .map(p => p.id);
+    
+    const available = availablePlayers.filter(p => !allSelectedPlayerIds.includes(p.id));
+    
+    if (available.length === 0) {
+      console.log('No players available for auto-pick');
+      return;
+    }
+    
+    // Find best available player for needed positions (by fantasy points per game)
     let bestPlayer = null;
     for (const position of neededPositions) {
-      const positionPlayers = availablePlayers.filter(p => p.fantasy_position === position);
+      const positionPlayers = available.filter(p => p.fantasy_position === position);
       if (positionPlayers.length > 0) {
-        bestPlayer = positionPlayers[0]; // For now, just take first available
-        console.log('Found position-specific player:', bestPlayer.name, 'for position:', position);
+        // Sort by fantasy points per game and take the best
+        const sortedPositionPlayers = positionPlayers.sort((a, b) => {
+          const aPoints = a.fantasy_points_per_game || 0;
+          const bPoints = b.fantasy_points_per_game || 0;
+          return bPoints - aPoints;
+        });
+        bestPlayer = sortedPositionPlayers[0];
+        console.log('Found position-specific player:', bestPlayer.name, 'for position:', position, 'with', bestPlayer.fantasy_points_per_game, 'FP/Game');
         break;
       }
     }
     
-    // If no position-specific player found, take any available player
-    if (!bestPlayer && availablePlayers.length > 0) {
-      bestPlayer = availablePlayers[0];
-      console.log('Using fallback player:', bestPlayer.name);
+    // If no position-specific player found, take the best available player overall
+    if (!bestPlayer) {
+      const sortedByFantasyPoints = available.sort((a, b) => {
+        const aPoints = a.fantasy_points_per_game || 0;
+        const bPoints = b.fantasy_points_per_game || 0;
+        return bPoints - aPoints;
+      });
+      bestPlayer = sortedByFantasyPoints[0];
+      console.log('Using best available player:', bestPlayer.name, 'with', bestPlayer.fantasy_points_per_game, 'FP/Game');
     }
     
     if (bestPlayer) {
-      console.log('Auto-picking player:', bestPlayer.name);
+      console.log('Auto-picking player:', bestPlayer.name, 'with', bestPlayer.fantasy_points_per_game, 'FP/Game');
       selectPlayer(bestPlayer, true);
     } else {
       console.log('No players available for auto-pick');

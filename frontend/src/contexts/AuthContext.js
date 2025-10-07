@@ -28,13 +28,34 @@ export const AuthProvider = ({ children }) => {
             setUser(response.user);
             setToken(storedToken);
           } else {
-            // Token is invalid, clear it
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
+            // Token is invalid, try to refresh it
+            try {
+              const newToken = await refreshToken();
+              if (newToken) {
+                // Token refreshed successfully, verify it
+                const verifyResponse = await authAPI.verifyToken(newToken);
+                if (verifyResponse && verifyResponse.success && verifyResponse.user) {
+                  setUser(verifyResponse.user);
+                  setToken(newToken);
+                } else {
+                  // Refresh token is also invalid, clear everything
+                  localStorage.removeItem('access_token');
+                  localStorage.removeItem('refresh_token');
+                }
+              }
+            } catch (refreshError) {
+              // Refresh failed, clear all tokens
+              console.log('Token refresh failed, clearing tokens');
+              localStorage.removeItem('access_token');
+              localStorage.removeItem('refresh_token');
+            }
           }
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        // Only log non-token-expired errors to reduce noise
+        if (!error.message || !error.message.includes('Token has expired')) {
+          console.error('Auth initialization error:', error);
+        }
         // Clear invalid tokens
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');

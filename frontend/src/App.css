@@ -1,17 +1,42 @@
-/* Fantasy Rugby - Orange, Black, White Theme */
+/* Fantasy Rugby - Databricks Inspired Design System */
 
 :root {
-  --primary-orange: #d35400;
-  --dark-orange: #b8460a;
-  --light-orange: #e67e22;
-  --black: #1A1A1A;
-  --dark-gray: #2D2D2D;
-  --light-gray: #F5F5F5;
+  /* Royal Blue Primary Colors */
+  --databricks-blue: #4169E1;
+  --databricks-dark-blue: #1E3A8A;
+  --databricks-light-blue: #E6F0FF;
+  --databricks-accent: #00A86B;
+  
+  /* Neutral Palette */
+  --neutral-900: #1A1A1A;
+  --neutral-800: #2D2D2D;
+  --neutral-700: #404040;
+  --neutral-600: #666666;
+  --neutral-500: #808080;
+  --neutral-400: #999999;
+  --neutral-300: #CCCCCC;
+  --neutral-200: #E0E0E0;
+  --neutral-100: #F5F5F5;
+  --neutral-50: #FAFAFA;
   --white: #FFFFFF;
-  --success: #28A745;
-  --error: #DC3545;
-  --warning: #FFC107;
-  --info: #17A2B8;
+  
+  /* Semantic Colors */
+  --success: #00A86B;
+  --success-light: #E6F7F0;
+  --error: #E74C3C;
+  --error-light: #FDF2F2;
+  --warning: #F39C12;
+  --warning-light: #FEF9E7;
+  --info: #3498DB;
+  --info-light: #EBF5FB;
+  
+  /* Legacy support */
+  --primary-orange: var(--databricks-blue);
+  --dark-orange: var(--databricks-dark-blue);
+  --light-orange: var(--databricks-light-blue);
+  --black: var(--neutral-900);
+  --dark-gray: var(--neutral-800);
+  --light-gray: var(--neutral-100);
 }
 
 * {
@@ -21,10 +46,13 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: var(--white);
-  color: var(--black);
+  font-family: 'Inter', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  background-color: var(--neutral-50);
+  color: var(--neutral-900);
   line-height: 1.6;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 .App {
@@ -35,154 +63,234 @@ body {
 
 .main-content {
   flex: 1;
-  padding: 2rem;
-  max-width: 1200px;
+  padding: 24px;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  background-color: var(--white);
+  min-height: calc(100vh - 64px);
 }
 
-/* Typography */
+/* Typography - Databricks Style */
 h1, h2, h3, h4, h5, h6 {
-  color: var(--black);
-  margin-bottom: 1rem;
+  color: var(--neutral-900);
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  font-family: 'Poppins', 'Inter', sans-serif;
+  letter-spacing: -0.02em;
 }
 
 h1 {
-  font-size: 2.5rem;
+  font-size: 32px;
   font-weight: 700;
+  color: var(--databricks-blue);
 }
 
 h2 {
-  font-size: 2rem;
+  font-size: 24px;
   font-weight: 600;
 }
 
 h3 {
-  font-size: 1.5rem;
+  font-size: 20px;
   font-weight: 600;
 }
 
-/* Buttons */
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
+h4 {
+  font-size: 16px;
   font-weight: 600;
+}
+
+h5 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+h6 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Buttons - Databricks Style */
+.btn {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Inter', 'Poppins', sans-serif;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   text-decoration: none;
-  display: inline-block;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 32px;
+  white-space: nowrap;
 }
 
 .btn-primary {
-  background-color: var(--primary-orange);
+  background-color: var(--databricks-blue);
   color: var(--white);
+  border-color: var(--databricks-blue);
 }
 
 .btn-primary:hover {
-  background-color: var(--dark-orange);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+  background-color: var(--databricks-dark-blue);
+  border-color: var(--databricks-dark-blue);
+  box-shadow: 0 2px 4px rgba(0, 102, 204, 0.2);
 }
 
 .btn-secondary {
-  background-color: var(--black);
-  color: var(--white);
+  background-color: var(--neutral-100);
+  color: var(--neutral-700);
+  border-color: var(--neutral-200);
 }
 
 .btn-secondary:hover {
-  background-color: var(--dark-gray);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(26, 26, 26, 0.3);
+  background-color: var(--neutral-200);
+  border-color: var(--neutral-300);
 }
 
 .btn-outline {
   background-color: transparent;
-  color: var(--primary-orange);
-  border: 2px solid var(--primary-orange);
+  color: var(--databricks-blue);
+  border-color: var(--databricks-blue);
 }
 
 .btn-outline:hover {
-  background-color: var(--primary-orange);
-  color: var(--white);
+  background-color: var(--databricks-light-blue);
+  border-color: var(--databricks-blue);
 }
 
 .btn-large {
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
+  padding: 12px 24px;
+  font-size: 16px;
+  min-height: 40px;
 }
 
 .btn-small {
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
+  padding: 4px 12px;
+  font-size: 12px;
+  min-height: 24px;
 }
 
-/* Forms */
+.btn-icon {
+  padding: 8px;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+/* Forms - Databricks Style */
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 16px;
 }
 
 .form-label {
   display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: var(--black);
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--neutral-700);
+  font-size: 14px;
 }
 
 .form-input {
   width: 100%;
-  padding: 0.75rem;
-  border: 2px solid #E0E0E0;
+  padding: 8px 12px;
+  border: 1px solid var(--neutral-200);
   border-radius: 8px;
-  font-size: 1rem;
-  transition: border-color 0.3s ease;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  background-color: var(--white);
+  color: var(--neutral-900);
+  font-family: 'Inter', 'Poppins', sans-serif;
+  letter-spacing: -0.01em;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: var(--primary-orange);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+  border-color: var(--databricks-blue);
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.form-input:disabled {
+  background-color: var(--neutral-50);
+  color: var(--neutral-500);
+  cursor: not-allowed;
 }
 
 .form-input.error {
   border-color: var(--error);
 }
 
+.form-input.error:focus {
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.1);
+}
+
 .form-error {
   color: var(--error);
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
+  font-size: 12px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .form-success {
   color: var(--success);
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
+  font-size: 12px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-/* Cards */
+.form-help {
+  color: var(--neutral-600);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Cards - Databricks Style */
 .card {
   background: var(--white);
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  padding: 2rem;
-  margin-bottom: 2rem;
-  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  margin-bottom: 16px;
+  border: 1px solid var(--neutral-200);
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .card-header {
-  border-bottom: 2px solid var(--light-gray);
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--neutral-200);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .card-title {
-  color: var(--black);
-  font-size: 1.5rem;
+  color: var(--neutral-900);
+  font-size: 18px;
   font-weight: 600;
   margin: 0;
+}
+
+.card-subtitle {
+  color: var(--neutral-600);
+  font-size: 14px;
+  margin-top: 4px;
 }
 
 /* Alerts */
@@ -271,10 +379,105 @@ input[type="password"] {
   outline-offset: 2px;
 }
 
+/* Databricks-style Utility Classes */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.badge-primary {
+  background-color: var(--databricks-light-blue);
+  color: var(--databricks-blue);
+}
+
+.badge-success {
+  background-color: var(--success-light);
+  color: var(--success);
+}
+
+.badge-warning {
+  background-color: var(--warning-light);
+  color: var(--warning);
+}
+
+.badge-error {
+  background-color: var(--error-light);
+  color: var(--error);
+}
+
+.badge-neutral {
+  background-color: var(--neutral-100);
+  color: var(--neutral-700);
+}
+
+/* Status Indicators */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.status-indicator::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-indicator.success::before {
+  background-color: var(--success);
+}
+
+.status-indicator.warning::before {
+  background-color: var(--warning);
+}
+
+.status-indicator.error::before {
+  background-color: var(--error);
+}
+
+.status-indicator.info::before {
+  background-color: var(--info);
+}
+
+/* Data Table Styles */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th {
+  background-color: var(--neutral-50);
+  color: var(--neutral-700);
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--neutral-200);
+}
+
+.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--neutral-100);
+  color: var(--neutral-900);
+}
+
+.data-table tr:hover {
+  background-color: var(--neutral-50);
+}
+
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   :root {
-    --primary-orange: #FF4500;
-    --black: #000000;
+    --databricks-blue: #0066CC;
+    --neutral-900: #000000;
   }
 }

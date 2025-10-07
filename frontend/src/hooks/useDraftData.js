@@ -37,13 +37,18 @@ export const useDraftData = (leagueId, user, authLoading) => {
         }
         
         // Fetch teams in the league
-        const allTeams = await teamsAPI.getTeams();
-        const teamsData = allTeams.filter(team => team.league_id === leagueId);
+        const teamsData = await teamsAPI.getTeamsByLeague(leagueId);
         setTeams(teamsData || []);
         
-        // Fetch rugby players
-        const playersData = await rugbyPlayersAPI.getPlayers();
-        setPlayers(playersData || []);
+            // Fetch rugby players filtered by tournament
+            const tournamentId = league?.tournament_id;
+            console.log('DEBUG: Fetching players for tournament:', tournamentId);
+            const playersData = await rugbyPlayersAPI.getPlayers(tournamentId);
+            console.log('DEBUG: Players data received:', playersData?.length, 'players');
+            if (playersData && playersData.length > 0) {
+              console.log('DEBUG: First player data:', playersData[0]);
+            }
+            setPlayers(playersData || []);
         
         // Check if current user is the admin of this league
         if (league && user && user.id) {

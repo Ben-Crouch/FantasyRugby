@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { leaguesAPI } from '../services/api';
+import { leaguesAPI, tournamentsAPI } from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const LeagueSelection = () => {
   const [leagues, setLeagues] = useState([]);
+  const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -14,7 +15,8 @@ const LeagueSelection = () => {
     description: '',
     max_teams: 10,
     max_players_per_team: 15,
-    is_public: true
+    is_public: true,
+    tournament_id: ''
   });
   const [createErrors, setCreateErrors] = useState({});
   const [isCreating, setIsCreating] = useState(false);
@@ -29,31 +31,45 @@ const LeagueSelection = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchLeagues();
+    fetchData();
   }, []);
 
-  const fetchLeagues = async () => {
+  const fetchData = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      console.log('Fetching leagues...');
-      const data = await leaguesAPI.getLeagues();
-      console.log('Fetched leagues:', data);
+      console.log('Fetching data...');
+      const [leaguesData, tournamentsData] = await Promise.all([
+        leaguesAPI.getLeagues(),
+        tournamentsAPI.getTournaments()
+      ]);
       
-      if (data && Array.isArray(data)) {
-        setLeagues(data);
+      console.log('Fetched leagues:', leaguesData);
+      console.log('Fetched tournaments:', tournamentsData);
+      
+      if (leaguesData && Array.isArray(leaguesData)) {
+        setLeagues(leaguesData);
         console.log('Leagues set successfully');
       } else {
-        setError('Invalid response format from server');
+        setError('Invalid leagues response format from server');
+      }
+      
+      if (tournamentsData && Array.isArray(tournamentsData)) {
+        setTournaments(tournamentsData);
+        console.log('Tournaments set successfully');
+      } else {
+        console.warn('No tournaments available or invalid response format');
+        setTournaments([]);
       }
     } catch (error) {
-      console.error('Error fetching leagues:', error);
-      setError(`Failed to load your leagues: ${error.message}`);
+      console.error('Error fetching data:', error);
+      setError('Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleCreateLeague = async (e) => {
     e.preventDefault();
@@ -62,6 +78,9 @@ const LeagueSelection = () => {
     const errors = {};
     if (!createFormData.name.trim()) {
       errors.name = 'League name is required';
+    }
+    if (!createFormData.tournament_id) {
+      errors.tournament_id = 'Please select a tournament';
     }
     if (createFormData.max_teams < 2 || createFormData.max_teams > 12) {
       errors.max_teams = 'Max teams must be between 2 and 12';
@@ -181,7 +200,7 @@ const LeagueSelection = () => {
 
   if (error) {
     return (
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 24px' }}>
         {/* Page Header */}
         <div style={{ marginBottom: '32px' }}>
           <div style={{ 
@@ -237,7 +256,7 @@ const LeagueSelection = () => {
               {error}
             </p>
             <button 
-              onClick={fetchLeagues}
+              onClick={fetchData}
               className="btn btn-primary"
               style={{ fontSize: '14px' }}
             >
@@ -250,7 +269,7 @@ const LeagueSelection = () => {
   }
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 24px' }}>
       {/* Page Header */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ 
@@ -295,13 +314,6 @@ const LeagueSelection = () => {
           marginBottom: '32px'
         }}>
           <button
-            onClick={fetchLeagues}
-            className="btn btn-outline"
-            style={{ fontSize: '14px' }}
-          >
-            🔄 Refresh
-          </button>
-          <button
             onClick={() => navigate('/my-leagues')}
             className="btn btn-primary"
             style={{ fontSize: '14px' }}
@@ -313,42 +325,57 @@ const LeagueSelection = () => {
 
       {/* Main Content Grid */}
       <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
+        display: 'flex',
+        flexDirection: 'column',
         gap: '24px',
-        alignItems: 'start'
+        alignItems: 'stretch'
       }}>
         {/* Create League Card */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title" style={{ 
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          border: '1px solid var(--neutral-200)',
+          padding: '16px 24px',
+          minHeight: '80px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <h3 style={{ 
               fontSize: '20px', 
               fontWeight: '600',
               color: 'var(--databricks-blue)',
-              margin: '0 0 8px 0'
+              margin: '0',
+              padding: '0',
+              lineHeight: '1.2'
             }}>
               Create New League
             </h3>
             <p style={{ 
               color: 'var(--neutral-600)', 
-              margin: '0 0 16px 0',
-              fontSize: '14px'
+              margin: '0',
+              padding: '0',
+              fontSize: '14px',
+              lineHeight: '1.2'
             }}>
               Start your own fantasy rugby league
             </p>
-            
-            <button
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="btn btn-primary"
-              style={{ fontSize: '14px' }}
-            >
-              {showCreateForm ? '✖️ Cancel' : '➕ Create League'}
-            </button>
           </div>
-
-          {showCreateForm && (
-            <div style={{ padding: '24px' }}>
-              <form onSubmit={handleCreateLeague}>
+          
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="btn btn-primary"
+            style={{ fontSize: '14px' }}
+          >
+            {showCreateForm ? '✖️ Cancel' : '➕ Create League'}
+          </button>
+        </div>
+        
+        {showCreateForm && (
+          <div style={{ padding: '24px' }}>
+            <form onSubmit={handleCreateLeague}>
                 {createErrors.general && (
                   <div className="alert alert-error" style={{ marginBottom: '16px' }}>
                     {createErrors.general}
@@ -366,6 +393,25 @@ const LeagueSelection = () => {
                   />
                   {createErrors.name && (
                     <div className="form-error">{createErrors.name}</div>
+                  )}
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label className="form-label">Tournament</label>
+                  <select
+                    value={createFormData.tournament_id}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, tournament_id: e.target.value }))}
+                    className={`form-input ${createErrors.tournament_id ? 'error' : ''}`}
+                  >
+                    <option value="">Select a tournament...</option>
+                    {tournaments.map(tournament => (
+                      <option key={tournament.id} value={tournament.id}>
+                        {tournament.name}
+                      </option>
+                    ))}
+                  </select>
+                  {createErrors.tournament_id && (
+                    <div className="form-error">{createErrors.tournament_id}</div>
                   )}
                 </div>
 
@@ -403,10 +449,9 @@ const LeagueSelection = () => {
                 >
                   {isCreating ? '⏳ Creating...' : '🚀 Create League'}
                 </button>
-              </form>
-            </div>
-          )}
-        </div>
+            </form>
+          </div>
+        )}
 
         {/* Join League Card */}
         <div className="card">
@@ -419,11 +464,11 @@ const LeagueSelection = () => {
             }}>
               Join Existing League
             </h3>
-            <p style={{ 
-              color: 'var(--neutral-600)', 
-              margin: '0 0 16px 0',
-              fontSize: '14px'
-            }}>
+                          <p style={{ 
+                            color: 'var(--neutral-600)', 
+                            margin: '0',
+                            fontSize: '14px'
+                          }}>
               {leagues.length === 0 ? 'No leagues available' : `${leagues.length} league${leagues.length !== 1 ? 's' : ''} available`}
             </p>
           </div>

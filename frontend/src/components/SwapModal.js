@@ -11,8 +11,9 @@ const SwapModal = ({
   if (!showSwapModal || !swapData) return null;
 
   const getPlayerName = (playerId) => {
+    if (!playerId) return 'Unknown Player';
     if (!rugbyPlayers) return `Player ${playerId}`;
-    const player = rugbyPlayers.find(p => p.id.toString() === playerId.toString());
+    const player = rugbyPlayers.find(p => p.id && p.id.toString() === playerId.toString());
     return player ? player.name : `Player ${playerId}`;
   };
 
@@ -55,13 +56,13 @@ const SwapModal = ({
             color: 'var(--dark-gray)',
             fontWeight: '600'
           }}>
-            Move to Starting:
+            {swapData.targetPosition === 'Bench' ? 'Move to Bench:' : 'Move to Starting:'}
           </p>
           <div style={{
             padding: '1rem',
-            backgroundColor: '#E8F5E9',
+            backgroundColor: swapData.targetPosition === 'Bench' ? '#FFEBEE' : '#E8F5E9',
             borderRadius: '8px',
-            border: '2px solid #2ECC71',
+            border: swapData.targetPosition === 'Bench' ? '2px solid #C0392B' : '2px solid #2ECC71',
             fontWeight: 'bold',
             fontSize: '1.1rem'
           }}>
@@ -84,7 +85,7 @@ const SwapModal = ({
             color: 'var(--dark-gray)',
             fontWeight: '600'
           }}>
-            Select which player to move to Bench:
+            {swapData.targetPosition === 'Bench' ? 'Select which player to move to Starting:' : 'Select which player to move to Bench:'}
           </p>
           <div style={{ 
             maxHeight: '250px', 
@@ -104,9 +105,9 @@ const SwapModal = ({
                     }}
                     style={{
                       padding: '1rem',
-                      backgroundColor: isSelected ? '#FFEBEE' : 'white',
+                      backgroundColor: isSelected ? (swapData.targetPosition === 'Bench' ? '#E8F5E9' : '#FFEBEE') : 'white',
                       borderRadius: '8px',
-                      border: isSelected ? '2px solid #C0392B' : '2px solid #e0e0e0',
+                      border: isSelected ? (swapData.targetPosition === 'Bench' ? '2px solid #2ECC71' : '2px solid #C0392B') : '2px solid #e0e0e0',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       position: 'relative'
@@ -118,13 +119,13 @@ const SwapModal = ({
                       marginBottom: '0.25rem',
                       color: isSelected ? '#C0392B' : 'var(--black)'
                     }}>
-                      ⬇️ {getPlayerName(currentPlayer.player_id) || currentPlayer.name}
+                      ⬇️ {getPlayerName(currentPlayer.id) || currentPlayer.name}
                     </div>
                     <div style={{ 
                       fontSize: '0.9rem',
                       color: 'var(--dark-gray)'
                     }}>
-                      Currently: {currentPlayer.fantasy_position}
+                      {currentPlayer.fantasy_position}
                     </div>
                     {isSelected && (
                       <div style={{

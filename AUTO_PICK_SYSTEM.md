@@ -43,14 +43,23 @@ const allSelectedPlayerIds = Object.values(selectedPlayers)
 
 const available = availablePlayers.filter(p => !allSelectedPlayerIds.includes(p.id));
 
-// Pick a random player from top 10 available
-const randomPlayer = available[Math.floor(Math.random() * Math.min(10, available.length))];
+// Sort available players by fantasy points per game (highest first)
+const sortedByFantasyPoints = available.sort((a, b) => {
+  const aPoints = a.fantasy_points_per_game || 0;
+  const bPoints = b.fantasy_points_per_game || 0;
+  return bPoints - aPoints; // Descending order (highest first)
+});
+
+// Pick the player with the highest fantasy points per game
+const bestPlayer = sortedByFantasyPoints[0];
 ```
 
 **Smart Selection:**
-- Randomly selects from top 10 available players (not completely random)
+- Selects the player with the highest fantasy points per game
+- Uses fantasy points data to make optimal picks
 - Avoids picking already selected players
 - Falls back gracefully if no players available
+- Logs the selected player's fantasy points for transparency
 
 ## User Experience
 
