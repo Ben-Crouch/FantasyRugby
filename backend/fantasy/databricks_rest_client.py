@@ -60,11 +60,11 @@ class DatabricksRestClient:
         payload = {
             "warehouse_id": self.warehouse_id,
             "statement": sql,
-            "wait_timeout": "30s"
+            "wait_timeout": "50s"
         }
         
         try:
-            response = requests.post(url, headers=self.headers, json=payload, timeout=30)
+            response = requests.post(url, headers=self.headers, json=payload, timeout=60)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:

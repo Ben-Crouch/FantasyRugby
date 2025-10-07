@@ -18,20 +18,59 @@ from .utils import get_cached_result, set_cached_result, query_cache
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def rugby_players(request):
-    """Get rugby players, optionally filtered by tournament"""
+    """Get rugby players with fantasy points, optionally filtered by tournament"""
     try:
         client = DatabricksRestClient()
         
         # Get tournament_id from query parameters
         tournament_id = request.GET.get('tournament_id')
         
-        # Build SQL query
+        # Build SQL query using optimized materialized table (best performance)
         if tournament_id:
-            sql = f"SELECT * FROM default.rugby_players_25_26 WHERE tournament_id = {tournament_id}"
+            sql = f"""
+            SELECT 
+                id,
+                team,
+                name,
+                position,
+                fantasy_position,
+                tournament_id,
+                fantasy_points_per_game,
+                fantasy_points_per_minute,
+                total_fantasy_points,
+                matches_played,
+                total_tries,
+                total_tackles_made,
+                total_metres_carried,
+                avg_tries_per_match,
+                avg_tackles_per_match
+            FROM default.draft_players_optimized 
+            WHERE tournament_id = {tournament_id}
+            ORDER BY fantasy_points_per_game DESC, name
+            """
         else:
-            sql = "SELECT * FROM default.rugby_players_25_26"
+            sql = """
+            SELECT 
+                id,
+                team,
+                name,
+                position,
+                fantasy_position,
+                tournament_id,
+                fantasy_points_per_game,
+                fantasy_points_per_minute,
+                total_fantasy_points,
+                matches_played,
+                total_tries,
+                total_tackles_made,
+                total_metres_carried,
+                avg_tries_per_match,
+                avg_tackles_per_match
+            FROM default.draft_players_optimized
+            ORDER BY fantasy_points_per_game DESC, name
+            """
         
-        # Get rugby players
+        # Get rugby players with fantasy points
         try:
             result = client.execute_sql(sql)
             if result and 'result' in result and result['result'].get('data_array'):
@@ -43,7 +82,16 @@ def rugby_players(request):
                         'name': row[2],
                         'position': row[3],
                         'fantasy_position': row[4],
-                        'tournament_id': row[5] if len(row) > 5 else None
+                        'tournament_id': row[5],
+                        'fantasy_points_per_game': round(float(row[6]), 1) if row[6] is not None else 0.0,
+                        'fantasy_points_per_minute': round(float(row[7]), 2) if row[7] is not None else 0.0,
+                        'total_fantasy_points': round(float(row[8]), 1) if row[8] is not None else 0.0,
+                        'matches_played': int(row[9]) if row[9] is not None else 0,
+                        'total_tries': float(row[10]) if row[10] is not None else 0.0,
+                        'total_tackles_made': float(row[11]) if row[11] is not None else 0.0,
+                        'total_metres_carried': float(row[12]) if row[12] is not None else 0.0,
+                        'avg_tries_per_match': float(row[13]) if row[13] is not None else 0.0,
+                        'avg_tackles_per_match': float(row[14]) if row[14] is not None else 0.0
                     })
                 return Response(players)
             else:
@@ -69,21 +117,19 @@ def get_team_players(request, team_id):
     try:
         client = DatabricksRestClient()
         
-        # Check cache first (temporarily disabled for debugging)
+        # Check cache first
         cache_key = f'team_players_{team_id}'
-        # cached_result = get_cached_result(cache_key)
-        # if cached_result:
-        #     print(f"DEBUG: Cached team players for team {team_id}")
-        #     return Response(cached_result)
-        
-        print(f"DEBUG: get_team_players called with team_id: {team_id}")
+        cached_result = get_cached_result(cache_key)
+        if cached_result:
+            print(f"DEBUG: Cached team players for team {team_id}")
+            return Response(cached_result)
         
         # Get team players from the team_players table
         sql = f"""
-        SELECT tp.player_id, tp.position, tp.fantasy_position, tp.is_starting, rp.`Player Name`, rp.Team
+        SELECT tp.player_id, tp.position, tp.fantasy_position, tp.is_starting, rp.player_name, rp.team
         FROM default.team_players tp
-        LEFT JOIN default.rugby_players_25_26 rp ON tp.player_id = rp.`Player ID`
-        WHERE tp.team_id = {team_id}
+        LEFT JOIN default.rugby_players_25_26 rp ON tp.player_id = rp.player_id
+        WHERE tp.team_id = '{team_id}'
         ORDER BY tp.is_starting DESC, tp.position
         """
         
@@ -92,7 +138,6 @@ def get_team_players(request, team_id):
         if result and 'result' in result and result['result'].get('data_array'):
             players = []
             data_rows = result['result']['data_array']
-            print(f"DEBUG: get_team_players data_rows: {data_rows}")
             
             for row in data_rows:
                 players.append({
@@ -106,7 +151,6 @@ def get_team_players(request, team_id):
             
             # Cache the result
             set_cached_result(cache_key, {'players': players})
-            print(f"DEBUG: Cached team players for team {team_id}")
             return Response({'players': players})
         else:
             return Response({'players': []})
