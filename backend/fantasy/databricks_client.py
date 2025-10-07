@@ -54,7 +54,7 @@ class DatabricksClient:
         data = {
             "warehouse_id": self.warehouse_id,
             "statement": sql,
-            "wait_timeout": "30s"
+            "wait_timeout": "50s"
         }
         
         result = self._make_request('POST', endpoint, data)
@@ -68,7 +68,7 @@ class DatabricksClient:
         data = {
             "warehouse_id": self.warehouse_id,
             "statement": sql,
-            "wait_timeout": "30s"
+            "wait_timeout": "50s"
         }
         
         result = self._make_request('POST', endpoint, data)
