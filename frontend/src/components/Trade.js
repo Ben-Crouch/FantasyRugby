@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { leaguesAPI, teamsAPI } from '../services/api';
 
-const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTeams }) => {
+const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTeams, onLoadRugbyPlayers, isActive }) => {
   const [activeTradeTab, setActiveTradeTab] = useState('propose'); // 'propose' or 'received'
   const [selectedTradePartner, setSelectedTradePartner] = useState(null);
   const [mySelectedPlayers, setMySelectedPlayers] = useState([]);
@@ -9,6 +9,13 @@ const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTea
   const [tradeProposals, setTradeProposals] = useState([]);
   const [partnerPlayers, setPartnerPlayers] = useState([]);
   const [loadingPartnerPlayers, setLoadingPartnerPlayers] = useState(false);
+
+  // Load rugby players when component mounts
+  useEffect(() => {
+    if (onLoadRugbyPlayers && rugbyPlayers.length === 0) {
+      onLoadRugbyPlayers();
+    }
+  }, [onLoadRugbyPlayers, rugbyPlayers.length]);
 
   const loadTradeProposals = useCallback(async () => {
     try {
@@ -20,10 +27,10 @@ const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTea
   }, [leagueId]);
 
   useEffect(() => {
-    if (leagueId) {
+    if (leagueId && isActive) {
       loadTradeProposals();
     }
-  }, [leagueId, loadTradeProposals]);
+  }, [leagueId, isActive, loadTradeProposals]);
 
   // Load partner's players when a trade partner is selected
   useEffect(() => {
@@ -143,42 +150,54 @@ const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTea
 
   return (
     <div className="card">
-      <h3 style={{ marginBottom: '1.5rem', color: 'var(--primary-orange)' }}>
-        🔄 Trade Center
-      </h3>
+      <div className="card-header">
+        <h3 style={{ 
+          margin: 0, 
+          color: 'var(--databricks-blue)',
+          fontSize: '20px',
+          fontWeight: '600'
+        }}>
+          🔄 Trade Center
+        </h3>
+        <p style={{
+          margin: '4px 0 0 0',
+          color: 'var(--neutral-600)',
+          fontSize: '14px'
+        }}>
+          Propose and manage player trades with other teams
+        </p>
+      </div>
 
       {/* Trade Tabs */}
       <div style={{ 
         display: 'flex', 
-        gap: '1rem', 
-        marginBottom: '2rem',
-        borderBottom: '2px solid var(--light-gray)',
-        paddingBottom: '0.5rem'
+        gap: '4px', 
+        marginBottom: '24px',
+        borderBottom: '1px solid var(--neutral-200)',
+        paddingBottom: '16px'
       }}>
         <button
           onClick={() => setActiveTradeTab('propose')}
+          className="btn"
           style={{
-            padding: '0.5rem 1.5rem',
-            border: 'none',
-            backgroundColor: activeTradeTab === 'propose' ? 'var(--primary-orange)' : 'transparent',
-            color: activeTradeTab === 'propose' ? 'white' : 'var(--dark-gray)',
-            cursor: 'pointer',
-            borderRadius: '4px',
-            fontWeight: activeTradeTab === 'propose' ? 'bold' : 'normal'
+            backgroundColor: activeTradeTab === 'propose' ? 'var(--databricks-blue)' : 'transparent',
+            color: activeTradeTab === 'propose' ? 'white' : 'var(--neutral-700)',
+            border: activeTradeTab === 'propose' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+            fontSize: '14px',
+            fontWeight: '500'
           }}
         >
           📤 Propose Trade
         </button>
         <button
           onClick={() => setActiveTradeTab('received')}
+          className="btn"
           style={{
-            padding: '0.5rem 1.5rem',
-            border: 'none',
-            backgroundColor: activeTradeTab === 'received' ? 'var(--primary-orange)' : 'transparent',
-            color: activeTradeTab === 'received' ? 'white' : 'var(--dark-gray)',
-            cursor: 'pointer',
-            borderRadius: '4px',
-            fontWeight: activeTradeTab === 'received' ? 'bold' : 'normal'
+            backgroundColor: activeTradeTab === 'received' ? 'var(--databricks-blue)' : 'transparent',
+            color: activeTradeTab === 'received' ? 'white' : 'var(--neutral-700)',
+            border: activeTradeTab === 'received' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+            fontSize: '14px',
+            fontWeight: '500'
           }}
         >
           📥 Received Proposals {tradeProposals.length > 0 && `(${tradeProposals.length})`}

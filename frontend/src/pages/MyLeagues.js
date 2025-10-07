@@ -1,43 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { leaguesAPI, teamsAPI } from '../services/api';
+import { leaguesAPI, teamsAPI, tournamentsAPI } from '../services/api';
 
 const MyLeagues = () => {
   const [leagues, setLeagues] = useState([]);
   const [userTeams, setUserTeams] = useState([]);
+  const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Helper function to get tournament name for a league
+  const getTournamentName = (league) => {
+    if (!league.tournament_id || !tournaments.length) return null;
+    const tournament = tournaments.find(t => t.id.toString() === league.tournament_id.toString());
+    return tournament ? tournament.name : null;
+  };
+
   const loadUserLeagues = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Get all leagues
-      const allLeagues = await leaguesAPI.getLeagues();
-      
-      // Get all teams to find which leagues the user has joined
-      const allTeams = await teamsAPI.getTeams();
-      
-      // Filter teams for current user
-      const userTeamsData = allTeams.filter(team => {
-        return String(team.team_owner_user_id) === String(user?.id);
-      });
-      
-      // Get unique league IDs from user's teams
-      const userLeagueIds = [...new Set(userTeamsData.map(team => team.league_id))];
-      
-      // Filter leagues to only show ones the user has joined
-      const userLeagues = allLeagues.filter(league => 
-        userLeagueIds.includes(league.id)
-      );
+      // Get user-specific leagues, teams, and tournaments in parallel for better performance
+      const [userLeagues, userTeamsData, tournamentsData] = await Promise.all([
+        leaguesAPI.getLeagues(),
+        teamsAPI.getUserTeams(user?.id),
+        tournamentsAPI.getTournaments()
+      ]);
       
       setLeagues(userLeagues);
       setUserTeams(userTeamsData);
+      setTournaments(tournamentsData);
     } catch (error) {
       console.error('Error loading user leagues:', error);
       setError(`Failed to load your leagues: ${error.message}`);
@@ -202,7 +199,13 @@ const MyLeagues = () => {
                     marginBottom: '1rem',
                     fontSize: '0.95rem'
                   }}>
-                    {league.description || 'No description provided'}
+                    {(() => {
+                      const tournamentName = getTournamentName(league);
+                      if (tournamentName) {
+                        return `A ${tournamentName} Fantasy game`;
+                      }
+                      return league.description || 'No description provided';
+                    })()}
                   </p>
                   
                   <div style={{ 

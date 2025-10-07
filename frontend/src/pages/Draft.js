@@ -17,10 +17,13 @@ import PlayerFilters from '../components/draft/PlayerFilters';
 import PlayerList from '../components/draft/PlayerList';
 import MyTeamView from '../components/draft/MyTeamView';
 import PlayerConfirmModal from '../components/draft/PlayerConfirmModal';
-import DraftOrderSidebar from '../components/draft/DraftOrderSidebar';
+import DraftSectionMenu from '../components/draft/DraftSectionMenu';
+import DraftOrderView from '../components/draft/DraftOrderView';
 
 const Draft = () => {
   const [activeTab, setActiveTab] = useState('pick'); // 'pick' or 'team'
+  const [draftSectionView, setDraftSectionView] = useState('players'); // 'players' or 'order'
+  const [showDraftOrderModal, setShowDraftOrderModal] = useState(false);
   const [selectedPlayerForConfirm, setSelectedPlayerForConfirm] = useState(null);
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
@@ -38,6 +41,7 @@ const Draft = () => {
   // Draft state management
   const {
     draftStarted,
+    draftPaused,
     currentPick,
     currentTeam,
     timeRemaining,
@@ -46,6 +50,8 @@ const Draft = () => {
     setDraftComplete,
     handleStartDraft,
     handleShuffleDraft,
+    handlePauseDraft,
+    handleResumeDraft,
     handleSelectPlayer,
     markUserActive,
     markUserInactive,
@@ -116,6 +122,14 @@ const Draft = () => {
     setSelectedPlayerForConfirm(null);
   };
 
+  const handleViewDraftOrder = () => {
+    setShowDraftOrderModal(true);
+  };
+
+  const handleCloseDraftOrderModal = () => {
+    setShowDraftOrderModal(false);
+  };
+
   const handleStartDraftWithAPI = async () => {
     try {
       // Call backend API to update draft status to LIVE
@@ -136,59 +150,37 @@ const Draft = () => {
     try {
       setIsSavingDraft(true);
       
-      // Prepare team rosters for saving with proper starting/bench assignments
+      // Optimized team roster preparation
       const requiredPositions = {
-        'Prop': 1,
-        'Hooker': 1,
-        'Lock': 1,
-        'Back Row': 2,
-        'Scrum-half': 1,
-        'Fly-half': 1,
-        'Centre': 1,
-        'Back Three': 2
+        'Prop': 1, 'Hooker': 1, 'Lock': 1, 'Back Row': 2,
+        'Scrum-half': 1, 'Fly-half': 1, 'Centre': 1, 'Back Three': 2
       };
 
       const teamRosters = teams.map(team => {
         const teamPlayers = selectedPlayers[team.id] || [];
+        const positionCounts = {};
         
-        // Separate players into starting and bench based on position requirements
-        const startingPlayers = [];
-        const benchPlayers = [];
-        
-        teamPlayers.forEach(player => {
+        // Process players more efficiently
+        const processedPlayers = teamPlayers.map(player => {
           const position = player.fantasy_position;
+          const currentCount = positionCounts[position] || 0;
           const required = requiredPositions[position] || 0;
-          const currentCount = startingPlayers.filter(p => p.fantasy_position === position).length;
           
-          if (currentCount < required) {
-            startingPlayers.push({
-              player_id: player.id,
-              id: player.id,
-              name: player.name,
-              position: player.position,
-              fantasy_position: player.fantasy_position,
-              team: player.team,
-              is_starting: true
-            });
-          } else {
-            benchPlayers.push({
-              player_id: player.id,
-              id: player.id,
-              name: player.name,
-              position: player.position,
-              fantasy_position: player.fantasy_position,
-              team: player.team,
-              is_starting: false
-            });
-          }
+          const isStarting = currentCount < required;
+          positionCounts[position] = currentCount + 1;
+          
+          return {
+            id: player.id,
+            position: player.position,
+            fantasy_position: player.fantasy_position,
+            is_starting: isStarting
+          };
         });
-        
-        const allPlayers = [...startingPlayers, ...benchPlayers];
         
         return {
           team_id: team.id,
-          user_id: team.user_id || team.team_owner_user_id,
-          players: allPlayers
+          user_id: team.team_owner_user_id || team.user_id,
+          players: processedPlayers
         };
       });
       
@@ -243,21 +235,8 @@ const Draft = () => {
         onBackToLeague={handleBackToLeague}
       />
 
-      <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
-        {/* Left Sidebar - Draft Order */}
-        {teams.length > 0 && (
-          <div style={{ width: '280px', flexShrink: 0 }}>
-            <DraftOrderSidebar
-              teams={teams}
-              currentTeam={currentTeam}
-              selectedPlayers={selectedPlayers}
-              user={user}
-            />
-          </div>
-        )}
-
-        {/* Main Content */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+      {/* Main Content */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           {/* Tab Navigation */}
           <div className="card" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', gap: '1rem', borderBottom: '2px solid var(--light-gray)' }}>
@@ -305,14 +284,86 @@ const Draft = () => {
           isAdmin={isAdmin}
           onStartDraft={handleStartDraftWithAPI}
           onShuffleDraft={handleShuffleDraft}
+          onViewDraftOrder={handleViewDraftOrder}
           disabled={teams.length === 0}
         />
+      )}
+
+      {/* Pause/Resume Controls */}
+      {draftStarted && !draftComplete && isAdmin && (
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <div className="card-header">
+            <h3 className="card-title">Draft Controls</h3>
+          </div>
+          <div className="card-body" style={{ textAlign: 'center' }}>
+            {!draftPaused ? (
+              <button
+                onClick={handlePauseDraft}
+                style={{
+                  backgroundColor: 'var(--primary-orange)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 2rem',
+                  borderRadius: '6px',
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  marginRight: '1rem'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#E85D00'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--primary-orange)'}
+              >
+                ⏸️ Pause Draft
+              </button>
+            ) : (
+              <button
+                onClick={handleResumeDraft}
+                style={{
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 2rem',
+                  borderRadius: '6px',
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  marginRight: '1rem'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#218838'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#28a745'}
+              >
+                ▶️ Resume Draft
+              </button>
+            )}
+            <button
+              onClick={handleViewDraftOrder}
+              style={{
+                backgroundColor: 'var(--light-gray)',
+                color: 'var(--black)',
+                border: 'none',
+                padding: '0.75rem 2rem',
+                borderRadius: '6px',
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--light-gray)'}
+            >
+              📋 View Draft Order
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Draft Status */}
       {draftStarted && activeTab === 'pick' && (
         <DraftStatus
           draftStarted={draftStarted}
+          draftPaused={draftPaused}
           currentPick={currentPick}
           currentTeam={currentTeam}
           timeRemaining={timeRemaining}
@@ -326,20 +377,45 @@ const Draft = () => {
       {/* Pick Players Tab */}
       {activeTab === 'pick' && draftStarted && (
         <div className="card" style={{ marginBottom: '2rem' }}>
-          <h2 style={{ marginBottom: '1.5rem' }}>Available Players</h2>
-          <PlayerFilters
-            selectedPosition={selectedPosition}
-            setSelectedPosition={setSelectedPosition}
-            searchName={searchName}
-            setSearchName={setSearchName}
-          />
-          <PlayerList
-            players={filteredPlayers}
-            selectedPlayers={selectedPlayers}
-            onSelectPlayer={handlePlayerSelect}
-            currentTeam={currentTeam}
-            user={user}
-          />
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '1.5rem'
+          }}>
+            <h2 style={{ margin: 0 }}>
+              {draftSectionView === 'players' ? 'Available Players' : 'Draft Order'}
+            </h2>
+            <DraftSectionMenu 
+              activeView={draftSectionView}
+              setActiveView={setDraftSectionView}
+            />
+          </div>
+          
+          {draftSectionView === 'players' ? (
+            <>
+              <PlayerFilters
+                selectedPosition={selectedPosition}
+                setSelectedPosition={setSelectedPosition}
+                searchName={searchName}
+                setSearchName={setSearchName}
+              />
+              <PlayerList
+                players={filteredPlayers}
+                selectedPlayers={selectedPlayers}
+                onSelectPlayer={handlePlayerSelect}
+                currentTeam={currentTeam}
+                user={user}
+              />
+            </>
+          ) : (
+            <DraftOrderView
+              teams={teams}
+              currentTeam={currentTeam}
+              selectedPlayers={selectedPlayers}
+              user={user}
+            />
+          )}
         </div>
       )}
 
@@ -412,7 +488,75 @@ const Draft = () => {
           </div>
         </div>
       )}
+
+      {/* Draft Order Modal */}
+      {showDraftOrderModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ 
+            maxWidth: '900px', 
+            maxHeight: '80vh',
+            padding: '2rem',
+            overflow: 'auto',
+            margin: '1rem',
+            textAlign: 'center'
+          }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ marginBottom: '1rem' }}>📊 Draft Order</h2>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button
+                  onClick={handleShuffleDraft}
+                  disabled={teams.length === 0}
+                  style={{
+                    backgroundColor: teams.length === 0 ? 'var(--gray)' : 'var(--black)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '1rem 2rem',
+                    borderRadius: '6px',
+                    fontSize: '1.2rem',
+                    fontWeight: 'bold',
+                    cursor: teams.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: teams.length === 0 ? 0.6 : 1
+                  }}
+                >
+                  Shuffle Draft Order
+                </button>
+              </div>
+              <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
+                <button
+                  onClick={handleCloseDraftOrderModal}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: 'var(--neutral-600)',
+                    padding: '0.5rem'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <DraftOrderView 
+              teams={teams}
+              currentTeam={currentTeam}
+              selectedPlayers={selectedPlayers}
+              user={user}
+            />
+          </div>
         </div>
+      )}
       </div>
     </div>
   );

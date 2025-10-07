@@ -58,6 +58,29 @@ const PlayerCard = ({ player, onSelect, isSelected, disabled }) => {
           <p style={{ margin: '0.5rem 0 0 0', color: 'var(--dark-gray)', fontSize: '0.9rem' }}>
             Team: {player.team}
           </p>
+          {/* Fantasy Points Display */}
+          {player.fantasy_points_per_game !== undefined && (
+            <div style={{ marginTop: '0.75rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--dark-gray)' }}>Fantasy Points/Game:</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary-orange)' }}>
+                  {player.fantasy_points_per_game}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--dark-gray)' }}>Fantasy Points/Min:</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary-orange)' }}>
+                  {player.fantasy_points_per_minute}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--dark-gray)' }}>Total Fantasy Points:</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--primary-orange)' }}>
+                  {player.total_fantasy_points}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

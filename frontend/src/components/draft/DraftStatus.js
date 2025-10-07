@@ -3,8 +3,9 @@ import DraftTimer from './DraftTimer';
 
 const DraftStatus = ({ 
   draftStarted, 
+  draftPaused,
   currentPick, 
-  currentTeam, 
+  currentTeam,
   timeRemaining,
   totalPicks,
   user,
@@ -41,17 +42,17 @@ const DraftStatus = ({
         </h2>
         <p style={{ 
           margin: 0,
-          color: isCurrentTurn ? 'var(--primary-orange)' : 'var(--dark-gray)',
+          color: draftPaused ? '#dc3545' : (isCurrentTurn ? 'var(--primary-orange)' : 'var(--dark-gray)'),
           fontSize: '1.2rem',
-          fontWeight: isCurrentTurn ? 'bold' : 'normal'
+          fontWeight: (draftPaused || isCurrentTurn) ? 'bold' : 'normal'
         }}>
-          {isCurrentTurn ? "It's your turn!" : `Waiting for ${currentTeam?.team_name}...`}
+          {draftPaused ? "⏸️ Draft is paused" : (isCurrentTurn ? "It's your turn!" : `Waiting for ${currentTeam?.team_name}...`)}
         </p>
       </div>
       
-      <DraftTimer timeRemaining={timeRemaining} />
+      <DraftTimer timeRemaining={timeRemaining} draftPaused={draftPaused} />
       
-      {isCurrentTurn && (
+      {isCurrentTurn && !draftPaused && (
         <div style={{
           marginTop: '1rem',
           padding: '1rem',
@@ -62,6 +63,21 @@ const DraftStatus = ({
           fontWeight: 'bold'
         }}>
           Select a player from the list below
+        </div>
+      )}
+
+      {draftPaused && (
+        <div style={{
+          marginTop: '1rem',
+          padding: '1rem',
+          backgroundColor: '#f8d7da',
+          borderRadius: '6px',
+          textAlign: 'center',
+          color: '#721c24',
+          fontWeight: 'bold',
+          border: '1px solid #f5c6cb'
+        }}>
+          ⏸️ Draft is paused. The admin will resume when ready.
         </div>
       )}
     </div>

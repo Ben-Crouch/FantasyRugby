@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft, get_team_players, update_player_position, start_draft, get_draft_status, waiver_claims, process_waivers, trade_proposals, respond_to_trade, tournaments, chat_messages, chat_participants, update_read_status
+from .views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft, get_team_players, update_player_position, start_draft, get_draft_status, waiver_claims, process_waivers, trade_proposals, respond_to_trade, tournaments, chat_messages, chat_participants, update_read_status, tournament_availability, league_fixtures, next_matchup
 from .admin_views import remove_team_from_league, get_league_admin, is_user_league_admin
 from .authentication import register, login, refresh_token, verify_token, logout
 from .views.draft_views import debug_database
@@ -12,6 +12,9 @@ urlpatterns = [
     path('team-statistics/', team_statistics, name='team_statistics'),
     path('rugby-players/', rugby_players, name='rugby_players'),
     path('tournaments/', tournaments, name='tournaments'),
+    path('tournament-availability/', tournament_availability, name='tournament_availability'),
+    path('league-fixtures/', league_fixtures, name='league_fixtures'),
+    path('next-matchup/', next_matchup, name='next_matchup'),
     path('leagues/<int:league_id>/complete-draft/', complete_draft, name='complete_draft'),
     path('leagues/<int:league_id>/start-draft/', start_draft, name='start_draft'),
     path('leagues/<int:league_id>/draft-status/', get_draft_status, name='get_draft_status'),

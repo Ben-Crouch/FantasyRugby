@@ -3,67 +3,48 @@ import { useNavigate } from 'react-router-dom';
 
 const NavigationBar = ({ 
   leagueData, 
+  tournamentData,
   isAdmin, 
   draftComplete, 
   draftStatus,
   activeTab, 
   setActiveTab, 
-  onStartDraft 
+  onStartDraft,
+  chatUnreadCount = 0
 }) => {
   const navigate = useNavigate();
   
   return (
-    <div className="card" style={{ marginBottom: '2rem' }}>
-      {/* Breadcrumb Navigation */}
-      <div style={{ 
-        padding: '0.5rem 0', 
-        borderBottom: '1px solid #eee', 
-        marginBottom: '1rem',
-        fontSize: '0.9rem',
-        color: '#666'
-      }}>
-        <span 
-          onClick={() => navigate('/my-leagues')}
-          style={{ 
-            cursor: 'pointer', 
-            color: 'var(--primary-orange)',
-            textDecoration: 'underline'
-          }}
-        >
-          My Leagues
-        </span>
-        <span style={{ margin: '0 0.5rem' }}>→</span>
-        <span style={{ color: 'var(--black)', fontWeight: '500' }}>
-          {leagueData?.name || 'Fantasy League'}
-        </span>
-      </div>
-      
+    <div className="card" style={{ marginBottom: '24px' }}>
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        padding: '1rem 0'
+        padding: '16px 0'
       }}>
         <div>
-          <h2 style={{ margin: 0, color: 'var(--primary-orange)' }}>
+          <h2 style={{ 
+            margin: 0, 
+            color: 'var(--databricks-blue)',
+            fontSize: '24px',
+            fontWeight: '600'
+          }}>
             {leagueData?.name || 'Fantasy League'}
           </h2>
-          <p style={{ margin: '0.5rem 0 0 0', color: '#666' }}>
-            {leagueData?.description || 'A competitive fantasy rugby league'}
+          <p style={{ 
+            margin: '4px 0 0 0', 
+            color: 'var(--neutral-600)',
+            fontSize: '14px'
+          }}>
+            {tournamentData?.name ? `A ${tournamentData.name} Fantasy game` : (leagueData?.description || 'A Fantasy Rugby game')}
           </p>
         </div>
         
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button 
             onClick={() => navigate('/my-leagues')}
-            style={{ 
-              backgroundColor: 'transparent', 
-              border: '1px solid var(--primary-orange)',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              color: 'var(--primary-orange)',
-              cursor: 'pointer'
-            }}
+            className="btn btn-outline btn-small"
+            style={{ fontSize: '14px' }}
           >
             ← Back to My Leagues
           </button>
@@ -73,15 +54,7 @@ const NavigationBar = ({
                 <button 
                   onClick={onStartDraft}
                   className="btn btn-primary"
-                  style={{ 
-                    backgroundColor: 'var(--primary-orange)', 
-                    border: 'none',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
+                  style={{ fontSize: '14px' }}
                 >
                   🚀 Start Draft
                 </button>
@@ -91,13 +64,7 @@ const NavigationBar = ({
                   onClick={onStartDraft}
                   className="btn btn-primary"
                   style={{ 
-                    backgroundColor: 'var(--primary-orange)', 
-                    border: 'none',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
+                    fontSize: '14px',
                     animation: !isAdmin ? 'pulse 2s infinite' : 'none'
                   }}
                 >
@@ -111,61 +78,140 @@ const NavigationBar = ({
       
       <div style={{ 
         display: 'flex', 
-        gap: '1rem', 
-        borderTop: '1px solid #eee', 
-        paddingTop: '1rem' 
+        justifyContent: 'center',
+        gap: '12px', 
+        borderTop: '1px solid var(--neutral-200)', 
+        paddingTop: '16px' 
       }}>
         <button
           onClick={() => setActiveTab('league')}
+          className="btn"
           style={{
-            padding: '0.5rem 1rem',
-            border: 'none',
-            backgroundColor: activeTab === 'league' ? 'var(--primary-orange)' : 'transparent',
-            color: activeTab === 'league' ? 'white' : 'var(--primary-orange)',
-            cursor: 'pointer',
-            borderRadius: '4px'
+            backgroundColor: activeTab === 'league' ? 'var(--databricks-blue)' : 'transparent',
+            color: activeTab === 'league' ? 'white' : 'var(--neutral-700)',
+            border: activeTab === 'league' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+            fontSize: '14px',
+            fontWeight: '500',
+            width: '160px'
           }}
         >
           League Table
         </button>
         <button
           onClick={() => setActiveTab('my-team')}
+          className="btn"
           style={{
-            padding: '0.5rem 1rem',
-            border: 'none',
-            backgroundColor: activeTab === 'my-team' ? 'var(--primary-orange)' : 'transparent',
-            color: activeTab === 'my-team' ? 'white' : 'var(--primary-orange)',
-            cursor: 'pointer',
-            borderRadius: '4px'
+            backgroundColor: activeTab === 'my-team' ? 'var(--databricks-blue)' : 'transparent',
+            color: activeTab === 'my-team' ? 'white' : 'var(--neutral-700)',
+            border: activeTab === 'my-team' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+            fontSize: '14px',
+            fontWeight: '500',
+            width: '160px'
           }}
         >
           My Team
         </button>
+        {draftComplete && (
+          <button
+            onClick={() => setActiveTab('waivers')}
+            className="btn"
+            style={{
+              backgroundColor: activeTab === 'waivers' ? 'var(--databricks-blue)' : 'transparent',
+              color: activeTab === 'waivers' ? 'white' : 'var(--neutral-700)',
+              border: activeTab === 'waivers' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+              fontSize: '14px',
+              fontWeight: '500',
+              width: '160px'
+            }}
+          >
+            Waivers
+          </button>
+        )}
+        {draftComplete && (
+          <button
+            onClick={() => setActiveTab('trade')}
+            className="btn"
+            style={{
+              backgroundColor: activeTab === 'trade' ? 'var(--databricks-blue)' : 'transparent',
+              color: activeTab === 'trade' ? 'white' : 'var(--neutral-700)',
+              border: activeTab === 'trade' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+              fontSize: '14px',
+              fontWeight: '500',
+              width: '160px'
+            }}
+          >
+            Trade
+          </button>
+        )}
+        {draftComplete && (
+          <button
+            onClick={() => setActiveTab('fixtures')}
+            className="btn"
+            style={{
+              backgroundColor: activeTab === 'fixtures' ? 'var(--databricks-blue)' : 'transparent',
+              color: activeTab === 'fixtures' ? 'white' : 'var(--neutral-700)',
+              border: activeTab === 'fixtures' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+              fontSize: '14px',
+              fontWeight: '500',
+              width: '160px'
+            }}
+          >
+            Fixtures
+          </button>
+        )}
+        {draftComplete && (
+          <button
+            onClick={() => setActiveTab('matchup')}
+            className="btn"
+            style={{
+              backgroundColor: activeTab === 'matchup' ? 'var(--databricks-blue)' : 'transparent',
+              color: activeTab === 'matchup' ? 'white' : 'var(--neutral-700)',
+              border: activeTab === 'matchup' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+              fontSize: '14px',
+              fontWeight: '500',
+              width: '160px'
+            }}
+          >
+            Matchup
+          </button>
+        )}
         <button
-          onClick={() => setActiveTab('waivers')}
+          onClick={() => setActiveTab('chat')}
+          className="btn"
           style={{
-            padding: '0.5rem 1rem',
-            border: 'none',
-            backgroundColor: activeTab === 'waivers' ? 'var(--primary-orange)' : 'transparent',
-            color: activeTab === 'waivers' ? 'white' : 'var(--primary-orange)',
-            cursor: 'pointer',
-            borderRadius: '4px'
+            backgroundColor: activeTab === 'chat' ? 'var(--databricks-blue)' : 'transparent',
+            color: activeTab === 'chat' ? 'white' : 'var(--neutral-700)',
+            border: activeTab === 'chat' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+            fontSize: '14px',
+            fontWeight: '500',
+            width: '160px',
+            position: 'relative'
           }}
         >
-          Waivers
-        </button>
-        <button
-          onClick={() => setActiveTab('trade')}
-          style={{
-            padding: '0.5rem 1rem',
-            border: 'none',
-            backgroundColor: activeTab === 'trade' ? 'var(--primary-orange)' : 'transparent',
-            color: activeTab === 'trade' ? 'white' : 'var(--primary-orange)',
-            cursor: 'pointer',
-            borderRadius: '4px'
-          }}
-        >
-          Trade
+          💬 Chat
+          {chatUnreadCount > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '-8px',
+                backgroundColor: '#ff4444',
+                color: 'white',
+                borderRadius: '50%',
+                width: '20px',
+                height: '20px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: '20px',
+                padding: '0 4px'
+              }}
+            >
+              {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+            </span>
+          )}
         </button>
       </div>
     </div>

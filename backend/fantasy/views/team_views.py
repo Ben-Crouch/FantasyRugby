@@ -72,6 +72,14 @@ def join_league(request, league_id):
             stored_team_name = verify_result['result']['data_array'][0][0]
             print(f"DEBUG: VERIFICATION - What Databricks actually stored: {[stored_team_name]}")
         
+        # Generate/update fixtures for the league after team is added
+        try:
+            generate_league_fixtures_auto(client, league_id)
+            print(f"DEBUG: Fixtures generated/updated for league {league_id}")
+        except Exception as fixture_error:
+            print(f"WARNING: Failed to generate fixtures: {fixture_error}")
+            # Don't fail the join operation if fixture generation fails
+        
         return Response({'message': 'Successfully joined league'}, status=status.HTTP_201_CREATED)
         
     except Exception as e:
@@ -172,3 +180,156 @@ def team_statistics(request):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def generate_league_fixtures_auto(client, league_id):
+    """
+    Automatically generate/update fixtures for a league when teams are added
+    """
+    try:
+        # Get teams in the league
+        teams_sql = f"""
+        SELECT id, team_name, team_owner_user_id
+        FROM default.league_teams 
+        WHERE league_id = {league_id}
+        ORDER BY id
+        """
+        
+        teams_result = client.execute_sql(teams_sql)
+        
+        if not teams_result or 'result' not in teams_result or 'data_array' not in teams_result['result']:
+            print(f"DEBUG: No teams found for league {league_id}")
+            return False
+        
+        teams = []
+        for row in teams_result['result']['data_array']:
+            team_id, team_name, user_id = row
+            teams.append({
+                "id": team_id,
+                "name": team_name,
+                "user_id": user_id
+            })
+        
+        if len(teams) < 2:
+            print(f"DEBUG: Not enough teams ({len(teams)}) to generate fixtures for league {league_id}")
+            return False
+        
+        # Get tournament_id for this league
+        league_sql = f"""
+        SELECT tournament_id 
+        FROM default.user_created_leagues 
+        WHERE id = {league_id}
+        """
+        
+        league_result = client.execute_sql(league_sql)
+        
+        if not league_result or 'result' not in league_result or 'data_array' not in league_result['result']:
+            print(f"DEBUG: Could not get tournament_id for league {league_id}")
+            return False
+        
+        tournament_id = league_result['result']['data_array'][0][0]
+        
+        # Get tournament weeks
+        weeks_sql = f"""
+        SELECT Week, `Week Date`
+        FROM default.tournament_weeks 
+        WHERE Tournament_ID = {tournament_id}
+        ORDER BY `Week Date`
+        """
+        
+        weeks_result = client.execute_sql(weeks_sql)
+        
+        if not weeks_result or 'result' not in weeks_result or 'data_array' not in weeks_result['result']:
+            print(f"DEBUG: No weeks found for tournament {tournament_id}")
+            return False
+        
+        weeks_data = weeks_result['result']['data_array']
+        
+        # Generate round-robin fixtures
+        fixtures = generate_round_robin_fixtures_auto(teams, len(weeks_data))
+        
+        if not fixtures:
+            print(f"DEBUG: Failed to generate fixtures for league {league_id}")
+            return False
+        
+        # Clear existing fixtures for this league
+        clear_sql = f"DELETE FROM default.league_fixtures WHERE league_id = {league_id}"
+        client.execute_sql(clear_sql)
+        
+        # Insert new fixtures
+        fixtures_created = 0
+        for i, fixture in enumerate(fixtures):
+            if i < len(weeks_data):
+                week_data = weeks_data[i]
+                week_name = week_data[0]
+                week_date = week_data[1]
+                
+                # Determine if this is a playoff week (last 2 weeks)
+                is_playoff = i >= len(weeks_data) - 2
+                
+                insert_sql = f"""
+                INSERT INTO default.league_fixtures 
+                (league_id, tournament_id, week_number, week_date, home_team_id, away_team_id, 
+                 home_team_name, away_team_name, is_playoff)
+                VALUES (
+                    {league_id},
+                    {tournament_id},
+                    {fixture['week']},
+                    '{week_date}',
+                    {fixture['home_team_id']},
+                    {fixture['away_team_id']},
+                    '{fixture['home_team_name']}',
+                    '{fixture['away_team_name']}',
+                    {is_playoff}
+                )
+                """
+                
+                client.execute_sql(insert_sql)
+                fixtures_created += 1
+        
+        print(f"DEBUG: Generated {fixtures_created} fixtures for league {league_id}")
+        return True
+        
+    except Exception as e:
+        print(f"ERROR in generate_league_fixtures_auto: {e}")
+        return False
+
+
+def generate_round_robin_fixtures_auto(teams, weeks_available):
+    """Generate round-robin fixtures for teams (auto version)"""
+    if len(teams) < 2:
+        return []
+    
+    fixtures = []
+    num_teams = len(teams)
+    
+    # If odd number of teams, add a "bye" team
+    if num_teams % 2 == 1:
+        teams.append({"id": "BYE", "name": "BYE"})
+        num_teams += 1
+    
+    # Generate round-robin fixtures
+    for week in range(num_teams - 1):
+        week_fixtures = []
+        
+        # Rotate teams (except first team)
+        if week > 0:
+            teams[1:] = teams[2:] + [teams[1]]
+        
+        # Create matches for this week
+        for i in range(num_teams // 2):
+            home_team = teams[i]
+            away_team = teams[num_teams - 1 - i]
+            
+            if home_team["id"] != "BYE" and away_team["id"] != "BYE":
+                week_fixtures.append({
+                    'home_team_id': home_team["id"],
+                    'away_team_id': away_team["id"],
+                    'home_team_name': home_team["name"],
+                    'away_team_name': away_team["name"],
+                    'week': week + 1
+                })
+        
+        fixtures.extend(week_fixtures)
+    
+    return fixtures

@@ -37,9 +37,25 @@ const DraftHeader = ({ leagueData, teams, onBackToLeague }) => {
       {/* Draft Title */}
       <div className="card" style={{ marginBottom: '2rem' }}>
         <div style={{ textAlign: 'center' }}>
-          <h1 style={{ margin: 0, color: 'var(--black)', fontSize: '2.5rem' }}>
-            🏉 Player Draft
-          </h1>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: '12px',
+            marginBottom: '8px'
+          }}>
+            <img 
+              src="/rugby-ball.png" 
+              alt="Rugby Ball" 
+              style={{ 
+                width: '40px', 
+                height: '40px' 
+              }} 
+            />
+            <h1 style={{ margin: 0, color: 'var(--black)', fontSize: '2.5rem' }}>
+              Player Draft
+            </h1>
+          </div>
           <p style={{ 
             margin: '0.5rem 0 0 0', 
             color: 'var(--dark-gray)',

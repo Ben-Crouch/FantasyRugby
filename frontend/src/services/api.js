@@ -22,7 +22,14 @@
  * Version: 1.0.0
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001/api';
+
+// Request deduplication cache
+const pendingRequests = new Map();
+
+// Response cache for GET requests
+const responseCache = new Map();
+const CACHE_DURATION = 30000; // 30 seconds
 
 /**
  * Helper function to make API requests
@@ -37,6 +44,27 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api
  */
 const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
+  const method = options.method || 'GET';
+  
+  // Create a unique key for this request
+  const requestKey = `${method}_${url}_${JSON.stringify(options.body || {})}`;
+  
+  // For GET requests, check cache first
+  if (method === 'GET') {
+    const cacheKey = `${url}_${JSON.stringify(options.body || {})}`;
+    const cached = responseCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log(`DEBUG: Returning cached response for: ${url}`);
+      return cached.data;
+    }
+  }
+  
+  // If the same request is already pending, return the existing promise
+  if (pendingRequests.has(requestKey)) {
+    console.log(`DEBUG: Deduplicating request to: ${url}`);
+    return pendingRequests.get(requestKey);
+  }
+  
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
@@ -58,24 +86,54 @@ const apiRequest = async (endpoint, options = {}) => {
     },
   };
 
-  try {
-    console.log('DEBUG: Making API request to:', url);
-    const response = await fetch(url, config);
-    console.log('DEBUG: API response status:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('DEBUG: API error response:', errorData);
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
+  // Create the request promise
+  const requestPromise = (async () => {
+    try {
+      console.log('DEBUG: Making API request to:', url);
+      const response = await fetch(url, config);
+      console.log('DEBUG: API response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        
+        // Only log non-token-expired errors to reduce noise
+        if (!errorData.error || !errorData.error.includes('Token has expired')) {
+          console.error('DEBUG: API error response:', errorData);
+        }
+        
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
 
-    const data = await response.json();
-    console.log('DEBUG: API response data:', data);
-    return data;
-  } catch (error) {
-    console.error('API request failed:', error);
-    throw error;
-  }
+      const data = await response.json();
+      console.log('DEBUG: API response data:', data);
+      
+      // Cache GET responses
+      if (method === 'GET') {
+        const cacheKey = `${url}_${JSON.stringify(options.body || {})}`;
+        responseCache.set(cacheKey, {
+          data,
+          timestamp: Date.now()
+        });
+        console.log(`DEBUG: Cached response for: ${url}`);
+      }
+      
+      return data;
+    } catch (error) {
+      // Only log non-token-expired errors to reduce noise
+      if (!error.message || !error.message.includes('Token has expired')) {
+        console.error('API request failed:', error);
+      }
+      throw error;
+    } finally {
+      // Remove from pending requests when done
+      pendingRequests.delete(requestKey);
+    }
+  })();
+  
+  // Store the promise in the pending requests map
+  pendingRequests.set(requestKey, requestPromise);
+  
+  return requestPromise;
 };
 
 // Authentication API
@@ -117,6 +175,24 @@ export const authAPI = {
 };
 
 // Leagues API
+export const tournamentsAPI = {
+  getTournaments: async () => {
+    return apiRequest('/tournaments/');
+  },
+
+  getTournamentAvailability: async () => {
+    return apiRequest('/tournament-availability/');
+  },
+
+  getLeagueFixtures: async (leagueId) => {
+    return apiRequest(`/league-fixtures/?league_id=${leagueId}`);
+  },
+
+  getNextMatchup: async (leagueId, userId) => {
+    return apiRequest(`/next-matchup/?league_id=${leagueId}&user_id=${userId}`);
+  },
+};
+
 export const leaguesAPI = {
   getLeagues: async () => {
     return apiRequest('/user-leagues/');
@@ -202,6 +278,10 @@ export const teamsAPI = {
     return apiRequest(`/league-teams/?league_id=${leagueId}`);
   },
 
+  getUserTeams: async (userId) => {
+    return apiRequest(`/league-teams/?user_id=${userId}`);
+  },
+
   createTeam: async (teamData) => {
     return apiRequest('/league-teams/', {
       method: 'POST',
@@ -241,8 +321,9 @@ export const teamsAPI = {
 
 // Rugby Players API
 export const rugbyPlayersAPI = {
-  getPlayers: async () => {
-    return apiRequest('/rugby-players/');
+  getPlayers: async (tournamentId = null) => {
+    const url = tournamentId ? `/rugby-players/?tournament_id=${tournamentId}` : '/rugby-players/';
+    return apiRequest(url);
   },
 
   getPlayer: async (playerId) => {
