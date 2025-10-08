@@ -12,6 +12,10 @@ const Login = () => {
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTime, setLockoutTime] = useState(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetError, setResetError] = useState('');
 
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -75,6 +79,30 @@ const Login = () => {
         ...prev,
         [name]: ''
       }));
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setResetError('');
+    
+    if (!resetEmail) {
+      setResetError('Please enter your email address');
+      return;
+    }
+    
+    if (!/\S+@\S+\.\S+/.test(resetEmail)) {
+      setResetError('Please enter a valid email address');
+      return;
+    }
+    
+    try {
+      const { authAPI } = await import('../services/api');
+      await authAPI.requestPasswordReset(resetEmail);
+      setResetEmailSent(true);
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      setResetError('An error occurred. Please try again.');
     }
   };
 
@@ -196,6 +224,27 @@ const Login = () => {
             )}
           </div>
 
+          <div style={{ textAlign: 'left', marginTop: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgotPassword(true);
+                setResetEmail(formData.email);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--primary-orange)',
+                cursor: 'pointer',
+                fontSize: '14px',
+                textDecoration: 'underline',
+                padding: 0
+              }}
+            >
+              Forgot Password?
+            </button>
+          </div>
+
           <button
             type="submit"
             className="btn btn-primary btn-large"
@@ -215,6 +264,111 @@ const Login = () => {
           </p>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '2rem',
+            borderRadius: '8px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }}>
+            {!resetEmailSent ? (
+              <>
+                <h3 style={{ margin: '0 0 1rem 0', color: 'var(--databricks-blue)' }}>
+                  🔒 Reset Your Password
+                </h3>
+                
+                <p style={{ margin: '0 0 1.5rem 0', lineHeight: '1.5', color: 'var(--dark-gray)' }}>
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+
+                {resetError && (
+                  <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+                    {resetError}
+                  </div>
+                )}
+
+                <form onSubmit={handleForgotPassword}>
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label className="form-label">Email Address</label>
+                    <input
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="form-input"
+                      placeholder="your@email.com"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotPassword(false);
+                        setResetEmail('');
+                        setResetError('');
+                        setResetEmailSent(false);
+                      }}
+                      className="btn btn-outline"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                    >
+                      Send Reset Link
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <h3 style={{ margin: '0 0 1rem 0', color: 'var(--databricks-blue)' }}>
+                  ✅ Check Your Email
+                </h3>
+                
+                <p style={{ margin: '0 0 1rem 0', lineHeight: '1.5' }}>
+                  If an account exists with <strong>{resetEmail}</strong>, we've sent a password reset link to that address.
+                </p>
+
+                <p style={{ margin: '0 0 1.5rem 0', lineHeight: '1.5', fontSize: '14px', color: 'var(--dark-gray)' }}>
+                  Please check your email and click the reset link. The link will expire in 1 hour.
+                </p>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setResetEmail('');
+                      setResetEmailSent(false);
+                    }}
+                    className="btn btn-primary"
+                  >
+                    OK
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

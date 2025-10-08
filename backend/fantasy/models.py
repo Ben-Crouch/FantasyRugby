@@ -27,6 +27,7 @@ class UserCreatedLeague(models.Model):
     max_players_per_team = models.IntegerField(default=15)
     is_public = models.BooleanField(default=True)
     tournament = models.ForeignKey(Tournament, on_delete=models.CASCADE, related_name='leagues')
+    league_code = models.CharField(max_length=8, unique=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     
     class Meta:

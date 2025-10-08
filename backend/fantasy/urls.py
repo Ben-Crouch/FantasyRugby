@@ -1,13 +1,14 @@
 from django.urls import path
-from .views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft, get_team_players, update_player_position, start_draft, get_draft_status, waiver_claims, process_waivers, trade_proposals, respond_to_trade, tournaments, chat_messages, chat_participants, update_read_status, tournament_availability, league_fixtures, next_matchup
+from .views import user_leagues, league_teams, join_league, team_statistics, rugby_players, complete_draft, get_team_players, update_player_position, start_draft, get_draft_status, waiver_claims, process_waivers, trade_proposals, respond_to_trade, tournaments, chat_messages, chat_participants, update_read_status, tournament_availability, league_fixtures, next_matchup, invite_to_league
 from .admin_views import remove_team_from_league, get_league_admin, is_user_league_admin
-from .authentication import register, login, refresh_token, verify_token, logout
+from .authentication import register, login, refresh_token, verify_token, logout, request_password_reset, confirm_password_reset
 from .views.draft_views import debug_database
 
 urlpatterns = [
     # REST API endpoints
     path('user-leagues/', user_leagues, name='user_leagues'),
     path('user-leagues/<int:league_id>/join_league/', join_league, name='join_league'),
+    path('user-leagues/<int:league_id>/invite/', invite_to_league, name='invite_to_league'),
     path('league-teams/', league_teams, name='league_teams'),
     path('team-statistics/', team_statistics, name='team_statistics'),
     path('rugby-players/', rugby_players, name='rugby_players'),
@@ -38,6 +39,8 @@ urlpatterns = [
     path('auth/refresh/', refresh_token, name='refresh_token'),
     path('auth/verify/', verify_token, name='verify_token'),
     path('auth/logout/', logout, name='logout'),
+    path('auth/password-reset/request/', request_password_reset, name='request_password_reset'),
+    path('auth/password-reset/confirm/', confirm_password_reset, name='confirm_password_reset'),
     # Debug endpoints
     path('debug/database/', debug_database, name='debug_database'),
 ]

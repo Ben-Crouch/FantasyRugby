@@ -16,6 +16,9 @@ requests==2.31.0                 # HTTP library for Databricks API calls
 # Authentication and security
 PyJWT==2.8.0                     # JSON Web Token implementation
 
+# Email functionality
+django-sendgrid-v5==0.8.1        # SendGrid email service integration
+
 # Additional development dependencies (uncomment for development)
 # pytest==7.4.0                  # Testing framework
 # pytest-django==4.5.2           # Django testing utilities

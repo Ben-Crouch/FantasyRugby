@@ -146,9 +146,17 @@ def user_leagues(request):
             # Convert boolean to proper SQL format
             is_public_sql = 'true' if is_public else 'false'
             
+            # Generate unique league code
+            from .email_utils import generate_league_code, send_league_code_email
+            league_code = generate_league_code()
+            
+            # Get creator email and name for sending league code
+            creator_email = data.get('creator_email', '')
+            creator_name = data.get('creator_name', 'League Creator')
+            
             sql = f"""
-            INSERT INTO default.user_created_leagues (name, description, created_by_user_id, max_teams, max_players_per_team, is_public, created_at, draft_status, tournament_id)
-            VALUES ('{name}', '{description}', {user_id}, {max_teams}, {max_players_per_team}, {is_public_sql}, CURRENT_TIMESTAMP, 'NOT_STARTED', {tournament_id})
+            INSERT INTO default.user_created_leagues (name, description, created_by_user_id, max_teams, max_players_per_team, is_public, created_at, draft_status, tournament_id, league_code)
+            VALUES ('{name}', '{description}', {user_id}, {max_teams}, {max_players_per_team}, {is_public_sql}, CURRENT_TIMESTAMP, 'NOT_STARTED', {tournament_id}, '{league_code}')
             """
             result = client.execute_sql(sql)
             
@@ -171,8 +179,18 @@ def user_leagues(request):
                     'max_players_per_team': row[5],  # max_players_per_team is at index 5
                     'is_public': row[6],    # is_public is at index 6
                     'tournament_id': row[7],  # tournament_id is at index 7
-                    'created_at': row[8]   # created_at is at index 8
+                    'created_at': row[8],   # created_at is at index 8
+                    'league_code': league_code  # Add the generated league code
                 }
+                
+                # Send email with league code if email is provided
+                email_sent = False
+                if creator_email:
+                    email_sent = send_league_code_email(name, league_code, creator_email, creator_name)
+                    if not email_sent:
+                        print(f"Warning: Failed to send league code email to {creator_email}")
+                
+                league['email_sent'] = email_sent
                 return Response(league, status=status.HTTP_201_CREATED)
             else:
                 return Response({'error': 'Failed to retrieve created league'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -319,11 +337,15 @@ def join_league(request, league_id):
         data = request.data
         team_name = data.get('team_name')
         user_id = data.get('user_id')
+        league_code = data.get('league_code')
         
-        print(f"DEBUG: team_name={team_name}, user_id={user_id}, user_id type={type(user_id)}")
+        print(f"DEBUG: team_name={team_name}, user_id={user_id}, league_code={league_code}, user_id type={type(user_id)}")
         
         if not team_name:
             return Response({'error': 'Team name is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not league_code:
+            return Response({'error': 'League code is required'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Check if league exists
         league_sql = f"SELECT * FROM default.user_created_leagues WHERE id = {league_id}"
@@ -333,6 +355,11 @@ def join_league(request, league_id):
             return Response({'error': 'League not found'}, status=status.HTTP_404_NOT_FOUND)
         
         league = league_result['result']['data_array'][0]
+        
+        # Validate league code
+        stored_league_code = league[9] if len(league) > 9 else None  # league_code is at index 9
+        if not stored_league_code or stored_league_code.upper() != league_code.upper():
+            return Response({'error': 'Invalid league code'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Get user ID from request (assuming it's passed in the request)
         if not user_id:
@@ -392,6 +419,26 @@ def join_league(request, league_id):
                 print(f"DEBUG: VERIFICATION - What Databricks actually stored: {stored_name}")
         
         if result and 'status' in result and result['status'].get('state') == 'SUCCEEDED':
+            # Send notification email to league creator
+            try:
+                from .email_utils import send_league_join_notification
+                
+                # Get league creator's email (assuming it's stored in the league data)
+                # For now, we'll skip email notification if we don't have creator email
+                creator_email = data.get('creator_email', '')
+                joiner_name = data.get('joiner_name', 'A new player')
+                joiner_email = data.get('joiner_email', '')
+                
+                if creator_email:
+                    send_league_join_notification(
+                        league_name=league[1],  # league name is at index 1
+                        joiner_name=joiner_name,
+                        joiner_email=joiner_email,
+                        creator_email=creator_email
+                    )
+            except Exception as email_error:
+                print(f"Warning: Failed to send join notification email: {email_error}")
+            
             return Response({'status': 'Successfully joined league'}, status=status.HTTP_201_CREATED)
         else:
             return Response({'error': 'Failed to create team'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1490,4 +1537,94 @@ def tournaments(request):
         return Response({
             'error': str(e),
             'traceback': traceback.format_exc()
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def invite_to_league(request, league_id):
+    """
+    Send an invitation email to join a league
+    
+    POST /api/user-leagues/{league_id}/invite/
+    
+    Sends an email invitation with the league code to a potential player.
+    Only the league creator can send invitations.
+    
+    Parameters:
+        league_id (int): The ID of the league to invite to
+        
+    Request Body:
+        {
+            "invitee_email": "friend@example.com",
+            "invitee_name": "Friend's Name",
+            "inviter_name": "Your Name",
+            "inviter_email": "your@email.com"
+        }
+        
+    Returns:
+        200: Success - Invitation sent
+        400: Bad Request - Validation errors
+        403: Forbidden - Not the league creator
+        404: Not Found - League doesn't exist
+        500: Internal Server Error - Email sending failed
+    """
+    try:
+        client = DatabricksRestClient()
+        data = request.data
+        
+        # Validate required fields
+        invitee_email = data.get('invitee_email')
+        inviter_name = data.get('inviter_name')
+        inviter_email = data.get('inviter_email')
+        
+        if not invitee_email:
+            return Response({'error': 'Invitee email is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not inviter_name:
+            return Response({'error': 'Inviter name is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not inviter_email:
+            return Response({'error': 'Inviter email is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if league exists and get league details
+        league_sql = f"SELECT * FROM default.user_created_leagues WHERE id = {league_id}"
+        league_result = client.execute_sql(league_sql)
+        
+        if not league_result or 'result' not in league_result or not league_result['result'].get('data_array'):
+            return Response({'error': 'League not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        league = league_result['result']['data_array'][0]
+        league_name = league[1]  # league name is at index 1
+        league_code = league[9] if len(league) > 9 else None  # league_code is at index 9
+        
+        if not league_code:
+            return Response({'error': 'League code not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Send invitation email
+        from .email_utils import send_league_invitation
+        
+        invitee_name = data.get('invitee_name', '')
+        email_sent = send_league_invitation(
+            league_name=league_name,
+            league_code=league_code,
+            inviter_name=inviter_name,
+            inviter_email=inviter_email,
+            invitee_email=invitee_email,
+            invitee_name=invitee_name
+        )
+        
+        if email_sent:
+            return Response({
+                'status': 'Invitation sent successfully',
+                'league_name': league_name,
+                'league_code': league_code,
+                'invitee_email': invitee_email
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'error': 'Failed to send invitation email'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except Exception as e:
+        return Response({
+            'error': f'Failed to send invitation: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -10,6 +10,7 @@ const NavigationBar = ({
   activeTab, 
   setActiveTab, 
   onStartDraft,
+  onInvitePlayer,
   chatUnreadCount = 0
 }) => {
   const navigate = useNavigate();
@@ -32,15 +33,12 @@ const NavigationBar = ({
             {leagueData?.name || 'Fantasy League'}
           </h2>
           <p style={{ 
-            margin: '4px 0 0 0', 
+            margin: '4px 0 8px 0', 
             color: 'var(--neutral-600)',
             fontSize: '14px'
           }}>
             {tournamentData?.name ? `A ${tournamentData.name} Fantasy game` : (leagueData?.description || 'A Fantasy Rugby game')}
           </p>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button 
             onClick={() => navigate('/my-leagues')}
             className="btn btn-outline btn-small"
@@ -48,6 +46,18 @@ const NavigationBar = ({
           >
             ← Back to My Leagues
           </button>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {isAdmin && onInvitePlayer && (
+            <button 
+              onClick={onInvitePlayer}
+              className="btn btn-outline"
+              style={{ fontSize: '14px' }}
+            >
+              📧 Invite Player
+            </button>
+          )}
           {draftStatus !== 'COMPLETED' && (
             <>
               {draftStatus === 'NOT_STARTED' && isAdmin && (

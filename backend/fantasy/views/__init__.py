@@ -23,6 +23,7 @@ from .trade_views import trade_proposals, respond_to_trade
 from .tournament_views import tournaments
 from .chat_views import chat_messages, chat_participants, update_read_status
 from .matchweek_views import tournament_availability, league_fixtures, next_matchup
+from ..rest_views import invite_to_league
 
 __all__ = [
     'user_leagues',
@@ -45,5 +46,6 @@ __all__ = [
     'update_read_status',
     'tournament_availability',
     'league_fixtures',
-    'next_matchup'
+    'next_matchup',
+    'invite_to_league'
 ]

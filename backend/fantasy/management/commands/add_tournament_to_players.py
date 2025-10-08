@@ -57,3 +57,4 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.ERROR(f'Error adding tournament_id column: {str(e)}')
             )
+

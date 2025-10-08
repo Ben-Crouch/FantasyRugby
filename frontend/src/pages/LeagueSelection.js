@@ -16,16 +16,21 @@ const LeagueSelection = () => {
     max_teams: 10,
     max_players_per_team: 15,
     is_public: true,
-    tournament_id: ''
+    tournament_id: '',
+    creator_email: '',
+    creator_name: ''
   });
   const [createErrors, setCreateErrors] = useState({});
   const [isCreating, setIsCreating] = useState(false);
   const [joinFormData, setJoinFormData] = useState({
     leagueId: '',
-    teamName: ''
+    teamName: '',
+    leagueCode: ''
   });
   const [joinErrors, setJoinErrors] = useState({});
   const [isJoining, setIsJoining] = useState(false);
+  const [leagueSearchTerm, setLeagueSearchTerm] = useState('');
+  const [showLeagueDropdown, setShowLeagueDropdown] = useState(false);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -33,6 +38,18 @@ const LeagueSelection = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLeagueDropdown && !event.target.closest('.league-search-container')) {
+        setShowLeagueDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLeagueDropdown]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -115,13 +132,22 @@ const LeagueSelection = () => {
         console.log('Updated leagues:', updated);
         return updated;
       });
+      
+      // Show success message with league code
+      if (newLeague.league_code) {
+        alert(`🎉 League created successfully!\n\nYour league code is: ${newLeague.league_code}\n\n${newLeague.email_sent ? 'The code has been emailed to you.' : 'Please save this code to share with friends.'}`);
+      }
+      
       setShowCreateForm(false);
       setCreateFormData({
         name: '',
         description: '',
         max_teams: 10,
         max_players_per_team: 15,
-        is_public: true
+        is_public: true,
+        tournament_id: '',
+        creator_email: '',
+        creator_name: ''
       });
     } catch (error) {
       console.error('Error creating league:', error);
@@ -147,6 +173,9 @@ const LeagueSelection = () => {
     if (!joinFormData.teamName.trim()) {
       errors.teamName = 'Team name is required';
     }
+    if (!joinFormData.leagueCode.trim()) {
+      errors.leagueCode = 'League code is required';
+    }
 
     if (Object.keys(errors).length > 0) {
       setJoinErrors(errors);
@@ -166,7 +195,8 @@ const LeagueSelection = () => {
       
       await leaguesAPI.joinLeague(joinFormData.leagueId, {
         team_name: joinFormData.teamName,
-        user_id: user.id
+        user_id: user.id,
+        league_code: joinFormData.leagueCode
       });
       navigate('/league-dashboard', { 
         state: { 
@@ -426,7 +456,7 @@ const LeagueSelection = () => {
                   />
                 </div>
 
-                <div className="form-group" style={{ marginBottom: '24px' }}>
+                <div className="form-group" style={{ marginBottom: '20px' }}>
                   <label className="form-label">Max Teams</label>
                   <input
                     type="number"
@@ -439,6 +469,35 @@ const LeagueSelection = () => {
                   {createErrors.max_teams && (
                     <div className="form-error">{createErrors.max_teams}</div>
                   )}
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <label className="form-label">Your Name</label>
+                  <input
+                    type="text"
+                    value={createFormData.creator_name}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, creator_name: e.target.value }))}
+                    className="form-input"
+                    placeholder="Enter your name (for email notifications)"
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '24px' }}>
+                  <label className="form-label">Your Email (Optional)</label>
+                  <input
+                    type="email"
+                    value={createFormData.creator_email}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, creator_email: e.target.value }))}
+                    className="form-input"
+                    placeholder="Enter your email to receive the league code"
+                  />
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: 'var(--dark-gray)', 
+                    marginTop: '4px'
+                  }}>
+                    We'll email you the league code so you can share it with friends
+                  </div>
                 </div>
 
                 <button
@@ -495,26 +554,85 @@ const LeagueSelection = () => {
                   </div>
                 )}
 
-                <div className="form-group" style={{ marginBottom: '20px' }}>
+                <div className="form-group league-search-container" style={{ marginBottom: '20px', position: 'relative' }}>
                   <label className="form-label">Select League</label>
-                  <select
-                    value={joinFormData.leagueId}
-                    onChange={(e) => setJoinFormData(prev => ({ ...prev, leagueId: e.target.value }))}
+                  <input
+                    type="text"
+                    value={leagueSearchTerm}
+                    onChange={(e) => {
+                      setLeagueSearchTerm(e.target.value);
+                      setShowLeagueDropdown(true);
+                      // Clear selected league if search term changes
+                      if (joinFormData.leagueId) {
+                        setJoinFormData(prev => ({ ...prev, leagueId: '' }));
+                      }
+                    }}
+                    onFocus={() => setShowLeagueDropdown(true)}
                     className={`form-input ${joinErrors.leagueId ? 'error' : ''}`}
-                  >
-                    <option value="">Choose a league...</option>
-                    {leagues.map(league => (
-                      <option key={league.id} value={league.id}>
-                        {league.name} ({league.is_public ? 'Public' : 'Private'}) - Max {league.max_teams} teams
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Search for a league..."
+                  />
                   {joinErrors.leagueId && (
                     <div className="form-error">{joinErrors.leagueId}</div>
                   )}
+                  
+                  {showLeagueDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      maxHeight: '300px',
+                      overflowY: 'auto',
+                      backgroundColor: 'white',
+                      border: '1px solid var(--neutral-300)',
+                      borderRadius: '8px',
+                      marginTop: '4px',
+                      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                      zIndex: 1000
+                    }}>
+                      {leagues
+                        .filter(league => 
+                          league.name.toLowerCase().includes(leagueSearchTerm.toLowerCase()) ||
+                          leagueSearchTerm === ''
+                        )
+                        .map(league => (
+                          <div
+                            key={league.id}
+                            onClick={() => {
+                              setJoinFormData(prev => ({ ...prev, leagueId: league.id }));
+                              setLeagueSearchTerm(league.name);
+                              setShowLeagueDropdown(false);
+                              setJoinErrors(prev => ({ ...prev, leagueId: '' }));
+                            }}
+                            style={{
+                              padding: '12px 16px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid var(--neutral-200)',
+                              transition: 'background-color 0.2s',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                          >
+                            <div style={{ fontWeight: '500', color: 'var(--databricks-blue)' }}>
+                              {league.name}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--dark-gray)', marginTop: '4px' }}>
+                              {league.is_public ? 'Public' : 'Private'} • Max {league.max_teams} teams
+                            </div>
+                          </div>
+                        ))}
+                      {leagues.filter(league => 
+                        league.name.toLowerCase().includes(leagueSearchTerm.toLowerCase())
+                      ).length === 0 && leagueSearchTerm && (
+                        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--dark-gray)' }}>
+                          No leagues found matching "{leagueSearchTerm}"
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <div className="form-group" style={{ marginBottom: '24px' }}>
+                <div className="form-group" style={{ marginBottom: '20px' }}>
                   <label className="form-label">Your Team Name</label>
                   <input
                     type="text"
@@ -525,6 +643,21 @@ const LeagueSelection = () => {
                   />
                   {joinErrors.teamName && (
                     <div className="form-error">{joinErrors.teamName}</div>
+                  )}
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '24px' }}>
+                  <label className="form-label">League Code</label>
+                  <input
+                    type="text"
+                    value={joinFormData.leagueCode}
+                    onChange={(e) => setJoinFormData(prev => ({ ...prev, leagueCode: e.target.value.toUpperCase() }))}
+                    className={`form-input ${joinErrors.leagueCode ? 'error' : ''}`}
+                    placeholder="Enter your league code"
+                    maxLength="7"
+                  />
+                  {joinErrors.leagueCode && (
+                    <div className="form-error">{joinErrors.leagueCode}</div>
                   )}
                 </div>
 
