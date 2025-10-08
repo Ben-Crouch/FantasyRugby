@@ -28,6 +28,17 @@ const LeagueDashboard = () => {
   const [swapData, setSwapData] = useState(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoModalData, setInfoModalData] = useState(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showInviteSuccessModal, setShowInviteSuccessModal] = useState(false);
+  const [inviteSuccessData, setInviteSuccessData] = useState(null);
+  const [inviteData, setInviteData] = useState({
+    invitee_email: '',
+    invitee_name: '',
+    inviter_name: '',
+    inviter_email: ''
+  });
+  const [inviteErrors, setInviteErrors] = useState({});
+  const [isInviting, setIsInviting] = useState(false);
   const [draftComplete, setDraftComplete] = useState(false);
   const [draftStatus, setDraftStatus] = useState('NOT_STARTED');
   const [loadingRugbyPlayers, setLoadingRugbyPlayers] = useState(false);
@@ -493,6 +504,80 @@ const LeagueDashboard = () => {
     setSwapData(null);
   };
 
+  const handleInvitePlayer = () => {
+    setShowInviteModal(true);
+    // Pre-fill inviter info from user data
+    setInviteData(prev => ({
+      ...prev,
+      inviter_name: user?.username || user?.email || 'League Admin',
+      inviter_email: user?.email || ''
+    }));
+  };
+
+  const handleInviteSubmit = async (e) => {
+    e.preventDefault();
+    
+    const errors = {};
+    if (!inviteData.invitee_email.trim()) {
+      errors.invitee_email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(inviteData.invitee_email)) {
+      errors.invitee_email = 'Please enter a valid email address';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setInviteErrors(errors);
+      return;
+    }
+
+    setIsInviting(true);
+    setInviteErrors({});
+
+    try {
+      // Auto-populate inviter fields from user data
+      const invitePayload = {
+        ...inviteData,
+        inviter_name: user?.username || user?.email || 'League Admin',
+        inviter_email: user?.email || ''
+      };
+      
+      const response = await leaguesAPI.inviteToLeague(leagueData.id, invitePayload);
+      
+      // Show success modal with league code
+      setShowInviteModal(false);
+      setInviteSuccessData({
+        leagueCode: response?.league_code || '',
+        inviteeEmail: invitePayload.invitee_email
+      });
+      setShowInviteSuccessModal(true);
+      setInviteData({
+        invitee_email: '',
+        invitee_name: '',
+        inviter_name: user?.username || user?.email || 'League Admin',
+        inviter_email: user?.email || ''
+      });
+    } catch (error) {
+      console.error('Error sending invitation:', error);
+      if (error.response && error.response.data && error.response.data.error) {
+        setInviteErrors({ general: error.response.data.error });
+      } else {
+        setInviteErrors({ general: 'Failed to send invitation. Please try again.' });
+      }
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const cancelInvite = () => {
+    setShowInviteModal(false);
+    setInviteData({
+      invitee_email: '',
+      invitee_name: '',
+      inviter_name: user?.username || user?.email || 'League Admin',
+      inviter_email: user?.email || ''
+    });
+    setInviteErrors({});
+  };
+
   if (loading) {
     return (
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -536,6 +621,7 @@ const LeagueDashboard = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onStartDraft={handleStartDraft}
+        onInvitePlayer={handleInvitePlayer}
         chatUnreadCount={chatUnreadCount}
       />
 
@@ -702,6 +788,155 @@ const LeagueDashboard = () => {
                 OK
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Success Modal */}
+      {showInviteSuccessModal && inviteSuccessData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '2rem',
+            borderRadius: '8px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: 'var(--databricks-blue)' }}>
+              🎉 Invitation Processed!
+            </h3>
+            
+            <p style={{ margin: '0 0 1.5rem 0', lineHeight: '1.5' }}>
+              Your invitation has been processed. Share this league code with your friend:
+            </p>
+            
+            <div style={{
+              backgroundColor: '#f8f9fa',
+              border: '2px solid var(--primary-orange)',
+              borderRadius: '8px',
+              padding: '1.5rem',
+              textAlign: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{
+                fontSize: '12px',
+                color: 'var(--dark-gray)',
+                marginBottom: '0.5rem',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '1px'
+              }}>
+                League Code
+              </div>
+              <div style={{
+                fontSize: '32px',
+                fontWeight: 'bold',
+                color: 'var(--primary-orange)',
+                letterSpacing: '4px',
+                fontFamily: 'monospace'
+              }}>
+                {inviteSuccessData.leagueCode}
+              </div>
+            </div>
+            
+            <p style={{ 
+              margin: '0 0 1.5rem 0', 
+              fontSize: '14px', 
+              color: 'var(--dark-gray)',
+              lineHeight: '1.5'
+            }}>
+              You can share this code manually with <strong>{inviteSuccessData.inviteeEmail}</strong> via text, email, or any other method.
+            </p>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowInviteSuccessModal(false)}
+                className="btn btn-primary"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '2rem',
+            borderRadius: '8px',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h3 style={{ margin: '0 0 1.5rem 0', color: 'var(--databricks-blue)' }}>
+              📧 Invite Player to League
+            </h3>
+            
+            {inviteErrors.general && (
+              <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+                {inviteErrors.general}
+              </div>
+            )}
+
+            <form onSubmit={handleInviteSubmit}>
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">Friend's Email</label>
+                <input
+                  type="email"
+                  value={inviteData.invitee_email}
+                  onChange={(e) => setInviteData(prev => ({ ...prev, invitee_email: e.target.value }))}
+                  className={`form-input ${inviteErrors.invitee_email ? 'error' : ''}`}
+                  placeholder="friend@example.com"
+                />
+                {inviteErrors.invitee_email && (
+                  <div className="form-error">{inviteErrors.invitee_email}</div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={cancelInvite}
+                  className="btn btn-outline"
+                  disabled={isInviting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isInviting}
+                >
+                  {isInviting ? '⏳ Sending...' : '📧 Send Invitation'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

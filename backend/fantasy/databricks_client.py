@@ -166,6 +166,7 @@ class DatabricksClient:
             'max_players_per_team': 'INT',
             'is_public': 'BOOLEAN',
             'tournament_id': 'BIGINT',
+            'league_code': 'STRING',
             'created_at': 'TIMESTAMP'
         }
         tables_created &= self.create_table('user_created_leagues', schema)

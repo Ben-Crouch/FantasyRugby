@@ -172,6 +172,23 @@ export const authAPI = {
       method: 'POST',
     });
   },
+
+  requestPasswordReset: async (email) => {
+    return apiRequest('/auth/password-reset/request/', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  confirmPasswordReset: async (token, newPassword) => {
+    return apiRequest('/auth/password-reset/confirm/', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        token, 
+        new_password: newPassword 
+      }),
+    });
+  },
 };
 
 // Leagues API
@@ -213,6 +230,13 @@ export const leaguesAPI = {
     return apiRequest(`/user-leagues/${leagueId}/join_league/`, {
       method: 'POST',
       body: JSON.stringify(teamData),
+    });
+  },
+
+  inviteToLeague: async (leagueId, inviteData) => {
+    return apiRequest(`/user-leagues/${leagueId}/invite/`, {
+      method: 'POST',
+      body: JSON.stringify(inviteData),
     });
   },
 

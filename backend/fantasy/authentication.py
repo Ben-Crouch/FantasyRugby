@@ -434,3 +434,193 @@ def logout(request):
         'success': True,
         'message': 'Logged out successfully'
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def request_password_reset(request):
+    """
+    Request a password reset token
+    
+    POST /api/auth/password-reset/request/
+    
+    Sends a password reset email with a token that expires in 1 hour.
+    
+    Request Body:
+        {
+            "email": "user@example.com"
+        }
+        
+    Returns:
+        200: Success - Email sent (always returns success even if email doesn't exist for security)
+        400: Bad Request - Invalid email format
+    """
+    try:
+        email = request.data.get('email', '').strip().lower()
+        
+        if not email:
+            return Response({
+                'error': 'Email is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate email format
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, email):
+            return Response({
+                'error': 'Invalid email format'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        client = DatabricksRestClient()
+        
+        # Check if user exists
+        check_sql = f"SELECT * FROM default.auth_users WHERE LOWER(email) = '{email}'"
+        result = client.execute_sql(check_sql)
+        
+        # Always return success for security (don't reveal if email exists)
+        # But only send email if user actually exists
+        if result and 'result' in result and result['result'].get('data_array'):
+            user_data = result['result']['data_array'][0]
+            user_id = user_data[0]
+            username = user_data[1]
+            
+            # Generate reset token
+            reset_token = secrets.token_urlsafe(32)
+            expires_at = (timezone.now() + timedelta(hours=1)).isoformat()
+            
+            # Store reset token in database
+            # First, create table if it doesn't exist
+            create_table_sql = """
+            CREATE TABLE IF NOT EXISTS default.password_reset_tokens (
+                id BIGINT GENERATED ALWAYS AS IDENTITY,
+                user_id BIGINT NOT NULL,
+                token STRING NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                used BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+            client.execute_sql(create_table_sql)
+            
+            # Insert reset token
+            insert_sql = f"""
+            INSERT INTO default.password_reset_tokens (user_id, token, expires_at)
+            VALUES ({user_id}, '{reset_token}', '{expires_at}')
+            """
+            client.execute_sql(insert_sql)
+            
+            # Send reset email
+            from .email_utils import send_password_reset_email
+            send_password_reset_email(email, reset_token, username)
+        
+        # Always return success message
+        return Response({
+            'success': True,
+            'message': 'If an account exists with that email, a password reset link has been sent.'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in password reset request: {e}")
+        return Response({
+            'error': 'An error occurred processing your request'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def confirm_password_reset(request):
+    """
+    Confirm password reset with token and set new password
+    
+    POST /api/auth/password-reset/confirm/
+    
+    Verifies the reset token and updates the user's password.
+    
+    Request Body:
+        {
+            "token": "reset-token-string",
+            "new_password": "newpassword123"
+        }
+        
+    Returns:
+        200: Success - Password updated
+        400: Bad Request - Invalid token or password
+        404: Not Found - Token not found or expired
+    """
+    try:
+        token = request.data.get('token', '').strip()
+        new_password = request.data.get('new_password', '').strip()
+        
+        if not token:
+            return Response({
+                'error': 'Reset token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not new_password:
+            return Response({
+                'error': 'New password is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if len(new_password) < 6:
+            return Response({
+                'error': 'Password must be at least 6 characters long'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        client = DatabricksRestClient()
+        
+        # Find the reset token
+        token_sql = f"""
+        SELECT * FROM default.password_reset_tokens 
+        WHERE token = '{token}' AND used = FALSE
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+        token_result = client.execute_sql(token_sql)
+        
+        if not token_result or 'result' not in token_result or not token_result['result'].get('data_array'):
+            return Response({
+                'error': 'Invalid or expired reset token'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        token_data = token_result['result']['data_array'][0]
+        token_id = token_data[0]
+        user_id = token_data[1]
+        expires_at = token_data[3]
+        
+        # Check if token has expired
+        from datetime import datetime
+        if datetime.fromisoformat(expires_at.replace('Z', '+00:00')) < datetime.now(timezone.utc):
+            return Response({
+                'error': 'Reset token has expired. Please request a new one.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Hash the new password
+        hashed_password = hash_password(new_password)
+        
+        # Update user password
+        update_sql = f"""
+        UPDATE default.auth_users 
+        SET password = '{hashed_password}'
+        WHERE id = {user_id}
+        """
+        client.execute_sql(update_sql)
+        
+        # Mark token as used
+        mark_used_sql = f"""
+        UPDATE default.password_reset_tokens 
+        SET used = TRUE
+        WHERE id = {token_id}
+        """
+        client.execute_sql(mark_used_sql)
+        
+        return Response({
+            'success': True,
+            'message': 'Password has been reset successfully'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"Error in password reset confirmation: {e}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': 'An error occurred resetting your password'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
