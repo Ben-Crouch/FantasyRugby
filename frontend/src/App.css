@@ -315,22 +315,34 @@ h3 {
 
   /* Smaller table text on mobile */
   .table {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
   }
 
   .table thead th {
-    padding: 0.5rem;
-    font-size: 0.75rem;
+    padding: 0.25rem 0.35rem;
+    font-size: 0.65rem;
+    white-space: nowrap;
   }
 
   .table tbody td {
-    padding: 0.5rem;
-    font-size: 0.75rem;
+    padding: 0.25rem 0.35rem;
+    font-size: 0.65rem;
+    white-space: nowrap;
   }
 
   .badge {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.35rem;
+  }
+
+  /* Make team names and text wrap less */
+  .table tbody td strong {
     font-size: 0.65rem;
-    padding: 0.2rem 0.5rem;
+    display: block;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
