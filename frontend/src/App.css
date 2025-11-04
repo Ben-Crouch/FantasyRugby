@@ -239,23 +239,98 @@ h3 {
   100% { transform: rotate(360deg); }
 }
 
+/* Tables */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+}
+
+.table thead th {
+  background-color: var(--light-gray);
+  color: var(--black);
+  font-weight: 600;
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 2px solid var(--primary-orange);
+}
+
+.table tbody td {
+  padding: 1rem;
+  border-bottom: 1px solid #E0E0E0;
+}
+
+.table tbody tr:hover {
+  background-color: var(--light-gray);
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.badge-info {
+  background-color: #D1ECF1;
+  color: #0C5460;
+}
+
+.badge-success {
+  background-color: #D4EDDA;
+  color: #155724;
+}
+
+.badge-warning {
+  background-color: #FFF3CD;
+  color: #856404;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .main-content {
     padding: 1rem;
   }
-  
+
   h1 {
     font-size: 2rem;
   }
-  
+
   h2 {
     font-size: 1.5rem;
   }
-  
+
   .btn {
     width: 100%;
     margin-bottom: 0.5rem;
+  }
+
+  /* Smaller table text on mobile */
+  .table {
+    font-size: 0.75rem;
+  }
+
+  .table thead th {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .table tbody td {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
   }
 }
 
