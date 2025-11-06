@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { leaguesAPI, teamsAPI } from '../services/api';
 
 const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTeams, onLoadRugbyPlayers, isActive }) => {
-  const [activeTradeTab, setActiveTradeTab] = useState('propose'); // 'propose' or 'received'
+  const [activeTradeTab, setActiveTradeTab] = useState('propose'); // 'propose', 'received', or 'sent'
   const [selectedTradePartner, setSelectedTradePartner] = useState(null);
   const [mySelectedPlayers, setMySelectedPlayers] = useState([]);
   const [theirSelectedPlayers, setTheirSelectedPlayers] = useState([]);
   const [tradeProposals, setTradeProposals] = useState([]);
   const [partnerPlayers, setPartnerPlayers] = useState([]);
   const [loadingPartnerPlayers, setLoadingPartnerPlayers] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Load rugby players when component mounts
   useEffect(() => {
@@ -106,14 +107,15 @@ const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTea
       };
 
       await leaguesAPI.proposeTrade(leagueId, tradeData);
-      
-      alert('✅ Trade proposal sent successfully!');
-      
+
+      // Show success modal
+      setShowSuccessModal(true);
+
       // Reset selections
       setMySelectedPlayers([]);
       setTheirSelectedPlayers([]);
       setSelectedTradePartner(null);
-      
+
       // Reload trade proposals
       loadTradeProposals();
     } catch (error) {
@@ -169,9 +171,9 @@ const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTea
       </div>
 
       {/* Trade Tabs */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '4px', 
+      <div style={{
+        display: 'flex',
+        gap: '4px',
         marginBottom: '24px',
         borderBottom: '1px solid var(--neutral-200)',
         paddingBottom: '16px'
@@ -200,7 +202,20 @@ const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTea
             fontWeight: '500'
           }}
         >
-          📥 Received Proposals {tradeProposals.length > 0 && `(${tradeProposals.length})`}
+          📥 Received {tradeProposals.filter(t => t.to_team_id === selectedTeam.id && t.status === 'PENDING').length > 0 && `(${tradeProposals.filter(t => t.to_team_id === selectedTeam.id && t.status === 'PENDING').length})`}
+        </button>
+        <button
+          onClick={() => setActiveTradeTab('sent')}
+          className="btn"
+          style={{
+            backgroundColor: activeTradeTab === 'sent' ? 'var(--databricks-blue)' : 'transparent',
+            color: activeTradeTab === 'sent' ? 'white' : 'var(--neutral-700)',
+            border: activeTradeTab === 'sent' ? '1px solid var(--databricks-blue)' : '1px solid var(--neutral-200)',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          📨 Sent {tradeProposals.filter(t => t.from_team_id === selectedTeam.id).length > 0 && `(${tradeProposals.filter(t => t.from_team_id === selectedTeam.id).length})`}
         </button>
       </div>
 
@@ -575,6 +590,224 @@ const Trade = ({ selectedTeam, rugbyPlayers, teamPlayers, user, leagueId, allTea
                 })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Sent Proposals Tab */}
+      {activeTradeTab === 'sent' && (
+        <div>
+          {tradeProposals.filter(trade => trade.from_team_id === selectedTeam.id).length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem',
+              color: 'var(--dark-gray)'
+            }}>
+              <p style={{ fontSize: '3rem', marginBottom: '1rem' }}>📬</p>
+              <p style={{ fontSize: '1.1rem' }}>No sent trade proposals</p>
+              <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                Trade proposals you send to other teams will appear here
+              </p>
+            </div>
+          ) : (
+            <div>
+              {tradeProposals
+                .filter(trade => trade.from_team_id === selectedTeam.id)
+                .map(trade => {
+                  const toTeam = allTeams.find(t => t.id === trade.to_team_id);
+
+                  // Parse player IDs from JSON strings
+                  let offeredPlayerIds = [];
+                  let requestedPlayerIds = [];
+                  try {
+                    offeredPlayerIds = JSON.parse(trade.players_offered || '[]');
+                    requestedPlayerIds = JSON.parse(trade.players_requested || '[]');
+                  } catch (e) {
+                    console.error('Error parsing player IDs:', e);
+                  }
+
+                  const getStatusBadge = (status) => {
+                    const styles = {
+                      'PENDING': { bg: '#FFF3CD', color: '#856404', text: '⏳ Pending' },
+                      'ACCEPTED': { bg: '#D4EDDA', color: '#155724', text: '✅ Accepted' },
+                      'REJECTED': { bg: '#F8D7DA', color: '#721C24', text: '❌ Rejected' }
+                    };
+                    const style = styles[status] || styles['PENDING'];
+                    return (
+                      <span style={{
+                        padding: '0.4rem 0.8rem',
+                        borderRadius: '12px',
+                        backgroundColor: style.bg,
+                        color: style.color,
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {style.text}
+                      </span>
+                    );
+                  };
+
+                  return (
+                    <div
+                      key={trade.id}
+                      style={{
+                        border: '2px solid var(--primary-orange)',
+                        borderRadius: '8px',
+                        padding: '1.5rem',
+                        marginBottom: '1.5rem',
+                        backgroundColor: 'white'
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '1rem'
+                      }}>
+                        <h4 style={{
+                          margin: 0,
+                          color: 'var(--primary-orange)'
+                        }}>
+                          Trade Proposal to {toTeam?.team_name || 'Unknown Team'}
+                        </h4>
+                        {getStatusBadge(trade.status)}
+                      </div>
+
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '1.5rem',
+                        marginBottom: '1rem'
+                      }}>
+                        <div>
+                          <strong>You Offered:</strong>
+                          <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                            {offeredPlayerIds.map(playerId => (
+                              <li key={playerId}>{getPlayerName(playerId)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div>
+                          <strong>You Requested:</strong>
+                          <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                            {requestedPlayerIds.map(playerId => (
+                              <li key={playerId}>{getPlayerName(playerId)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      {trade.status === 'ACCEPTED' && (
+                        <div style={{
+                          padding: '0.75rem',
+                          backgroundColor: '#D4EDDA',
+                          borderRadius: '6px',
+                          color: '#155724',
+                          fontSize: '0.9rem'
+                        }}>
+                          ✅ This trade was accepted! Players have been swapped and added to benches.
+                        </div>
+                      )}
+
+                      {trade.status === 'REJECTED' && (
+                        <div style={{
+                          padding: '0.75rem',
+                          backgroundColor: '#F8D7DA',
+                          borderRadius: '6px',
+                          color: '#721C24',
+                          fontSize: '0.9rem'
+                        }}>
+                          ❌ This trade was rejected by {toTeam?.team_name || 'the other team'}.
+                        </div>
+                      )}
+
+                      {trade.status === 'PENDING' && (
+                        <div style={{
+                          padding: '0.75rem',
+                          backgroundColor: '#FFF3CD',
+                          borderRadius: '6px',
+                          color: '#856404',
+                          fontSize: '0.9rem'
+                        }}>
+                          ⏳ Waiting for {toTeam?.team_name || 'the other team'} to respond...
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '90%',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+          }}>
+            <h3 style={{
+              margin: '0 0 1rem 0',
+              color: 'var(--primary-orange)',
+              fontSize: '1.5rem',
+              fontWeight: 'bold'
+            }}>
+              Trade Proposal Sent!
+            </h3>
+
+            <div style={{
+              marginBottom: '1.5rem',
+              lineHeight: '1.6'
+            }}>
+              <p style={{
+                margin: 0,
+                color: 'var(--black)',
+                fontSize: '1rem'
+              }}>
+                Your trade proposal has been sent successfully. The other team will be notified and can review your offer.
+              </p>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '1rem'
+            }}>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: 'var(--primary-orange)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = '#e67e22'}
+                onMouseOut={(e) => e.target.style.backgroundColor = 'var(--primary-orange)'}
+              >
+                OK
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

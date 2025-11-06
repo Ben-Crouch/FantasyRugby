@@ -36,6 +36,15 @@ const MyTeam = ({
     return player ? player.team : '';
   };
 
+  const getPlayerStats = (playerId) => {
+    if (!playerId) return { ppg: null, ppm: null };
+    const player = rugbyPlayers.find(p => p.id && p.id.toString() === playerId.toString());
+    return {
+      ppg: player?.ppg || player?.PPG || null,
+      ppm: player?.ppm || player?.PPM || null
+    };
+  };
+
   const positionMapping = {
     'Prop': 'Prop',
     'Hooker': 'Hooker', 
@@ -273,7 +282,7 @@ const MyTeam = ({
                 <div style={{ flex: 1 }}>
                   {slot.player ? (
                     <>
-                      <div style={{ 
+                      <div style={{
                         fontSize: '1.1rem',
                         fontWeight: 'bold',
                         color: 'var(--black)',
@@ -281,15 +290,40 @@ const MyTeam = ({
                       }}>
                         {getPlayerName(slot.player.id)}
                       </div>
-                      <div style={{ 
+                      <div style={{
                         fontSize: '0.9rem',
-                        color: 'var(--dark-gray)'
+                        color: 'var(--dark-gray)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem'
                       }}>
-                        {getPlayerTeam(slot.player.id)}
+                        <span>{getPlayerTeam(slot.player.id)}</span>
+                        {(() => {
+                          const stats = getPlayerStats(slot.player.id);
+                          return (stats.ppg !== null || stats.ppm !== null) && (
+                            <span style={{
+                              display: 'flex',
+                              gap: '0.5rem',
+                              fontSize: '0.85rem',
+                              fontWeight: '600'
+                            }}>
+                              {stats.ppg !== null && (
+                                <span style={{ color: 'var(--primary-orange)' }}>
+                                  PPG: {typeof stats.ppg === 'number' ? stats.ppg.toFixed(1) : stats.ppg}
+                                </span>
+                              )}
+                              {stats.ppm !== null && (
+                                <span style={{ color: 'var(--primary-orange)' }}>
+                                  PPM: {typeof stats.ppm === 'number' ? stats.ppm.toFixed(1) : stats.ppm}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </>
                   ) : (
-                    <div style={{ 
+                    <div style={{
                       fontSize: '0.9rem',
                       color: 'var(--dark-gray)',
                       fontStyle: 'italic'
@@ -309,7 +343,7 @@ const MyTeam = ({
                     style={{
                       padding: '0.4rem 0.9rem',
                       fontSize: '0.85rem',
-                      backgroundColor: '#C0392B',
+                      backgroundColor: '#E57373',
                       color: 'white',
                       border: 'none',
                       borderRadius: '15px',
@@ -317,7 +351,7 @@ const MyTeam = ({
                       fontWeight: 'bold'
                     }}
                   >
-                    Bench
+                    Move to
                   </button>
                 )}
               </div>
@@ -381,7 +415,7 @@ const MyTeam = ({
                 <div style={{ flex: 1 }}>
                   {slot.player ? (
                     <>
-                      <div style={{ 
+                      <div style={{
                         fontSize: '1.1rem',
                         fontWeight: 'bold',
                         color: 'var(--black)',
@@ -389,15 +423,40 @@ const MyTeam = ({
                       }}>
                         {getPlayerName(slot.player.id)}
                       </div>
-                      <div style={{ 
+                      <div style={{
                         fontSize: '0.9rem',
-                        color: 'var(--dark-gray)'
+                        color: 'var(--dark-gray)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem'
                       }}>
-                        {getPlayerTeam(slot.player.id)} • {slot.player.fantasy_position || positionMapping[slot.player.position] || slot.player.position}
+                        <span>{getPlayerTeam(slot.player.id)} • {slot.player.fantasy_position || positionMapping[slot.player.position] || slot.player.position}</span>
+                        {(() => {
+                          const stats = getPlayerStats(slot.player.id);
+                          return (stats.ppg !== null || stats.ppm !== null) && (
+                            <span style={{
+                              display: 'flex',
+                              gap: '0.5rem',
+                              fontSize: '0.85rem',
+                              fontWeight: '600'
+                            }}>
+                              {stats.ppg !== null && (
+                                <span style={{ color: 'var(--primary-orange)' }}>
+                                  PPG: {typeof stats.ppg === 'number' ? stats.ppg.toFixed(1) : stats.ppg}
+                                </span>
+                              )}
+                              {stats.ppm !== null && (
+                                <span style={{ color: 'var(--primary-orange)' }}>
+                                  PPM: {typeof stats.ppm === 'number' ? stats.ppm.toFixed(1) : stats.ppm}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </>
                   ) : (
-                    <div style={{ 
+                    <div style={{
                       fontSize: '0.9rem',
                       color: 'var(--dark-gray)',
                       fontStyle: 'italic'
@@ -419,7 +478,7 @@ const MyTeam = ({
                     style={{
                       padding: '0.5rem 1rem',
                       fontSize: '0.85rem',
-                      backgroundColor: '#2ECC71',
+                      backgroundColor: '#81C784',
                       color: 'white',
                       border: 'none',
                       borderRadius: '15px',
@@ -427,7 +486,7 @@ const MyTeam = ({
                       fontWeight: 'bold'
                     }}
                   >
-                    Start
+                    Move to
                   </button>
                 )}
               </div>
