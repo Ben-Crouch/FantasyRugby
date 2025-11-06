@@ -1049,7 +1049,26 @@ def waiver_claims(request, league_id):
                     {'error': 'Missing required fields'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
+            # Verify team ownership - check if user owns the team
+            ownership_sql = f"SELECT team_owner_user_id FROM default.league_teams WHERE id = '{team_id}' AND league_id = {league_id}"
+            ownership_result = client.execute_sql(ownership_sql)
+
+            if not ownership_result or 'result' not in ownership_result or not ownership_result['result'].get('data_array'):
+                return Response(
+                    {'error': 'Team not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            team_owner_id = ownership_result['result']['data_array'][0][0]
+            print(f"DEBUG Waiver: team_id={team_id}, user_id={user_id}, team_owner_id={team_owner_id}")
+            if team_owner_id != int(user_id):
+                print(f"DEBUG Waiver: Ownership check failed - team_owner_id ({team_owner_id}) != user_id ({user_id})")
+                return Response(
+                    {'error': f'Permission denied: You do not own this team (Team owner: {team_owner_id}, Your ID: {user_id})'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
             # Get team's waiver order
             team_sql = f"SELECT waiver_order FROM default.league_teams WHERE id = '{team_id}' AND league_id = {league_id}"
             team_result = client.execute_sql(team_sql)
